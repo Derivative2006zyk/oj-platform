@@ -4,6 +4,8 @@ from app.database import async_session
 from app.models.problem import Problem
 from app.plugins.problem_plugin import service
 from app.schemas.problem import AnswerResponse, CategoryResponse
+from app.core.security import verify_admin_key
+from app.schemas.problem import ProblemCreate, ProblemUpdate
 
 router = APIRouter(prefix="/api", tags=["problems"])
 
@@ -40,3 +42,40 @@ async def get_answer(problem_id: int, db: AsyncSession = Depends(get_db)):
 @router.get("/tag")
 async def get_tags(db: AsyncSession = Depends(get_db)):
     return await service.get_all_tags(db)
+
+# 管理员接口
+
+@router.post("/admin/problems", status_code=201)
+async def create_problem(
+    data: ProblemCreate,
+    db: AsyncSession = Depends(get_db),
+    _: str = Depends(verify_admin_key)
+):
+    """创建题目，需要管理员密钥"""
+    problem = await service.create_problem(db, data)
+    return {"id": problem.id, "message": "创建成功"}
+
+@router.put("/admin/problems/{problem_id}")
+async def update_problem(
+    problem_id: int,
+    data: ProblemUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: str = Depends(verify_admin_key)
+):
+    """更新题目，需要管理员密钥"""
+    problem = await service.update_problem(db, problem_id, data)
+    if not problem:
+        raise HTTPException(status_code=404, detail="题目不存在")
+    return {"id": problem.id, "message": "更新成功"}
+
+@router.delete("/admin/problems/{problem_id}")
+async def delete_problem(
+    problem_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: str = Depends(verify_admin_key)
+):
+    """删除题目，需要管理员密钥"""
+    success = await service.delete_problem(db, problem_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="题目不存在")
+    return {"message": "删除成功"}
