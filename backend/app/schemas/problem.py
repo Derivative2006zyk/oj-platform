@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List
 
 class SubprojectCreate(BaseModel):
@@ -49,9 +49,7 @@ class ProblemSummary(BaseModel):
     difficulty: int
     tags: List[str]
     category_id: int
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ProblemDetail(BaseModel):
     id: int
@@ -66,9 +64,7 @@ class ProblemDetail(BaseModel):
     blanks: Optional[List[dict]] = None
     test_cases: List[dict] = []
     subprojects: List[dict] = []
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class AnswerResponse(BaseModel):
     answer: Optional[str] = None
@@ -79,6 +75,4 @@ class CategoryResponse(BaseModel):
     name: str
     description: Optional[str] = None
     sort_order: int
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
