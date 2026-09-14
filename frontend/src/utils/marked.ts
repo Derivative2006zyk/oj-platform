@@ -3,6 +3,7 @@ import { markedHighlight } from 'marked-highlight'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github.css'
 
+// 代码块语法高亮（模块级只执行一次，切勿移到组件内部）
 marked.use(
   markedHighlight({
     langPrefix: 'hljs language-',

@@ -1,4 +1,6 @@
-### 附：后端 0.1 版本进度
+# 附录
+
+### 一、后端 0.1 版本进度
 
 | 模块 | 状态 |
 |---|---|
@@ -9,36 +11,52 @@
 | 题目 CRUD API | 完成 |
 | 图片上传/访问 API | 完成 |
 | 后端测试（11 个） | 完成 |
-| 前端开发 | 待开始 |
+| 前端初始化与路由 | 完成 |
+| 题目列表页 | 完成 |
+| 题目详情页 | 完成 |
+| 题目录入页（上） | 完成 |
+| 题目录入页（下）与联调 | 待开始 |
+| Docker 部署与文档 | 待开始 |
 
-### 附：常用排查命令
+### 二、常用排查命令
+
+#### 1、Docker 相关
 
 ```
-# Docker 相关
 docker ps
 docker logs oj-platform-postgres-1
 docker exec -it oj-platform-postgres-1 psql -U oj -d oj_platform
+```
 
-# 数据库表操作
+#### 2、数据库表操作
+
+```
 \dt
 \d problems
 SELECT * FROM categories;
+```
 
-# 后端相关
+#### 3、后端相关
+
+```
 python -c "from app.main import app; [print(r.path) for r in app.routes]"
 alembic current
 alembic history
 alembic upgrade head
+```
 
-# 测试相关
+#### 4、测试相关
+
+```
 pytest tests/ -v
 pytest tests/ -v -s
 pytest tests/test_problems.py::test_get_categories -v
 ```
 
-### 附：常见错误分类
+### 三、常见错误分类
 
-#### 拼写错误
+#### 1、拼写错误
+
 | 错误写法 | 正确写法 |
 |---|---|
 | DataTime | DateTime |
@@ -47,7 +65,8 @@ pytest tests/test_problems.py::test_get_categories -v
 | content_typed | content_type |
 | setting.UPLOAD_DIR | settings.UPLOAD_DIR |
 
-#### 逻辑错误
+#### 2、逻辑错误
+
 | 错误 | 修复 |
 |---|---|
 | .scalar 少了括号 | .scalar() |
@@ -55,7 +74,8 @@ pytest tests/test_problems.py::test_get_categories -v
 | 缺详情路由 | 补上 |
 | 文件编码错误 | 改为 UTF-8 |
 
-#### 环境错误
+#### 3、环境错误
+
 | 错误 | 原因 | 解决 |
 |---|---|---|
 | ConnectionRefusedError | 容器未启动 | docker compose up -d |

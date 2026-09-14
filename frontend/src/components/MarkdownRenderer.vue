@@ -10,7 +10,9 @@ const props = defineProps<{ content: string }>()
 
 const rendered = computed(() => {
   if (!props.content) return ''
-  return marked(props.content)
+  // 兼容旧数据：把单数 /api/image/ 替换为复数 /api/images/
+  const content = String(props.content).replace(/\/api\/image\//g, '/api/images/')
+  return marked(content)
 })
 </script>
 
