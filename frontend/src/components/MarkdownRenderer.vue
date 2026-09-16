@@ -8,10 +8,23 @@ import { marked } from '../utils/marked'
 
 const props = defineProps<{ content: string }>()
 
+// 后端地址（开发环境）
+const BACKEND_URL = 'http://localhost:8000'
+
 const rendered = computed(() => {
   if (!props.content) return ''
-  // 兼容旧数据：把单数 /api/image/ 替换为复数 /api/images/
-  const content = String(props.content).replace(/\/api\/image\//g, '/api/images/')
+  let content = String(props.content)
+
+  // 1. 兼容旧格式：单数 /api/image/ → 复数 /api/images/
+  content = content.replace(/\/api\/image\//g, '/api/images/')
+
+  // 2. 把 Markdown 图片中的相对路径 /api/... 替换为后端绝对地址
+  //    匹配 ![alt](/api/xxx) 形式
+  content = content.replace(
+    /!\[([^\]]*)\]\(\/api\//g,
+    `![$1](${BACKEND_URL}/api/`
+  )
+
   return marked(content)
 })
 </script>
