@@ -8,12 +8,26 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - pg_data:/var/lib/postgresql/data
+      - ./data/postgres:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U oj -d oj_platform"]
       interval: 5s
       timeout: 3s
       retries: 5
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./data/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
 
   backend:
     build: ./backend
@@ -21,13 +35,16 @@ services:
       - "8000:8000"
     environment:
       DATABASE_URL: postgresql+asyncpg://oj:oj_password@postgres:5432/oj_platform
+      REDIS_URL: redis://redis:6379/0
+      EVENT_BUS_CHANNEL: oj:events
       ADMIN_KEY: ${ADMIN_KEY:-admin-key-change-me}
     volumes:
       - ./backend/uploads:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
 
-volumes:
-  pg_data:
+volumes: {}
