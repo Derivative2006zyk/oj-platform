@@ -3,26 +3,38 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.event_bus import get_event_bus
-from app.plugins.problem_plugin.api import router as problem_router
-from app.plugins.problem_plugin.image_api import router as image_router
+from app.core.plugin_registry import get_plugin_registry
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    bus = get_event_bus()
-
     # ===== 启动 =====
+
+    # 1. 连接 Redis 事件总线
+    bus = get_event_bus()
     await bus.connect()
-    # 各插件加载时会调用 bus.subscribe 注册处理器
-    # 所有插件加载完成后，启动监听
+
+    # 2. 发现并加载所有插件
+    registry = get_plugin_registry()
+    registry.discover("app.plugins")
+    await registry.load_all()
+
+    # 3. 启动事件总线监听（此时所有插件已订阅好事件）
     await bus.start_listening()
+
     print(f"[EventBus] connected to {bus.redis_url}")
     print(f"[EventBus] subscribed channels: {bus.list_subscribed_channels()}")
+    print(f"[PluginRegistry] plugins: {registry.list_plugins()}")
 
     yield
 
     # ===== 关闭 =====
+    registry = get_plugin_registry()
+    await registry.unload_all()
+
+    bus = get_event_bus()
     await bus.disconnect()
+
     print("[EventBus] disconnected")
 
 
@@ -39,9 +51,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(problem_router)
-app.include_router(image_router)
-
 
 @app.get("/health")
 async def health():
@@ -57,3 +66,17 @@ async def health():
         "status": "ok",
         "redis": "ok" if redis_ok else "down",
     }
+
+
+# ===== 挂载插件路由 =====
+# 必须在 lifespan 之前执行，让路由在应用创建时注册。
+# 但插件的实例化在 lifespan 中，所以这里先 discover 再挂载。
+_registry = get_plugin_registry()
+_registry.discover("app.plugins")
+
+# 触发实例化
+_registry._build_instances()
+
+# 挂载所有插件的路由
+for router in _registry.collect_routers():
+    app.include_router(router)
