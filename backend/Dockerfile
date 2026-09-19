@@ -1,5 +1,3 @@
-# backend/Dockerfile
-
 FROM python:3.11-slim
 
 # 设置工作目录
@@ -7,6 +5,7 @@ WORKDIR /app
 
 # 设置时区（可选，避免时间戳偏差）
 ENV TZ=Asia/Shanghai
+ENV PYTHONUNBUFFERED=1
 
 # 安装系统依赖（asyncpg 编译需要）
 RUN apt-get update && apt-get install -y --no-install-recommends \
