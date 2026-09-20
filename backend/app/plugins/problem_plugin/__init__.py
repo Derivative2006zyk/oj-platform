@@ -22,7 +22,8 @@ class ProblemPlugin(Plugin):
     def get_routers(self):
         from app.plugins.problem_plugin.api import router as problem_router
         from app.plugins.problem_plugin.image_api import router as image_router
-        return [problem_router, image_router]
+        from app.plugins.problem_plugin.admin_api import router as admin_router
+        return [problem_router, image_router, admin_router]
 
     # ===== 事件处理器 =====
 
