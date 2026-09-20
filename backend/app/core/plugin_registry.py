@@ -75,17 +75,29 @@ class PluginRegistry:
                 self._plugins[name] = cls()
 
     async def load_all(self) -> None:
-        """依次加载并启用所有插件。"""
+        """依次加载所有插件。根据 DB 中的 enabled 状态决定是否调用 on_load/on_enable。"""
         if self._loaded:
             return
 
         self._build_instances()
 
-        # 按依赖拓扑排序（简单实现：无依赖先加载）
+        # 从 DB 加载启用状态
+        from app.core.plugin_config_store import ensure_config, get_all_configs
+        await self._sync_configs_to_db()
+
+        db_configs = await get_all_configs()
+
         ordered = self._topological_order()
 
         for name in ordered:
             plugin = self._plugins[name]
+            db_config = db_configs.get(name)
+            enabled = db_config.enabled if db_config else True
+
+            if not enabled:
+                print(f"[PluginRegistry] skipped (disabled): {name}")
+                continue
+
             try:
                 await plugin.on_load()
                 await plugin.on_enable()
@@ -95,6 +107,12 @@ class PluginRegistry:
                 raise
 
         self._loaded = True
+
+    async def _sync_configs_to_db(self) -> None:
+        """把新发现的插件写入 DB（如果还没记录），保持已有记录。"""
+        from app.core.plugin_config_store import ensure_config
+        for name in self._plugins:
+            await ensure_config(name, default_enabled=True)
 
     async def unload_all(self) -> None:
         """逆序卸载所有插件。"""
@@ -115,19 +133,23 @@ class PluginRegistry:
         self._loaded = False
 
     async def enable(self, name: str) -> None:
-        """单独启用某插件。"""
+        """启用某插件，同时回写 DB。"""
         plugin = self._plugins.get(name)
         if plugin is None:
             raise KeyError(f"Plugin not found: {name}")
         await plugin.on_enable()
+        from app.core.plugin_config_store import set_enabled
+        await set_enabled(name, True)
         print(f"[PluginRegistry] enabled: {name}")
 
     async def disable(self, name: str) -> None:
-        """单独禁用某插件。"""
+        """禁用某插件，同时回写 DB。"""
         plugin = self._plugins.get(name)
         if plugin is None:
             raise KeyError(f"Plugin not found: {name}")
         await plugin.on_disable()
+        from app.core.plugin_config_store import set_enabled
+        await set_enabled(name, False)
         print(f"[PluginRegistry] disabled: {name}")
 
     # ============ 查询 ============
