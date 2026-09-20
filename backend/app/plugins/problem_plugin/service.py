@@ -1,10 +1,13 @@
 from sqlalchemy import select, func, delete
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.models.category import Category
 from app.models.problem import Problem
 from app.models.test_case import TestCase
 from app.models.research_subproject import ResearchSubproject
 from app.schemas.problem import ProblemCreate, ProblemUpdate
+from app.core.event_bus import get_event_bus
+from app.core.events import EventNames
 
 
 async def get_all_categories(db: AsyncSession):
@@ -163,6 +166,17 @@ async def create_problem(db: AsyncSession, data: ProblemCreate):
 
     await db.commit()
     await db.refresh(problem)
+
+    await get_event_bus().publish(
+        EventNames.PROBLEM_CREATED,
+        {
+            "id": problem.id,
+            "title": problem.title,
+            "category_id": problem.category_id,
+            "type": problem.type,
+        },
+    )
+
     return problem
 
 
@@ -214,6 +228,17 @@ async def update_problem(db: AsyncSession, problem_id: int, data: ProblemUpdate)
 
     await db.commit()
     await db.refresh(problem)
+
+    await get_event_bus().publish(
+        EventNames.PROBLEM_UPDATED,
+        {
+            "id": problem.id,
+            "title": problem.title,
+            "category_id": problem.category_id,
+            "type": problem.type,
+        },
+    )
+
     return problem
 
 
@@ -225,4 +250,10 @@ async def delete_problem(db: AsyncSession, problem_id: int):
 
     await db.delete(problem)
     await db.commit()
+
+    await get_event_bus().publish(
+        EventNames.PROBLEM_DELETED,
+        {"id": problem_id},
+    )
+
     return True
