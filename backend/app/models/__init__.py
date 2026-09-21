@@ -4,6 +4,7 @@ from app.models.problem import Problem
 from app.models.research_subproject import ResearchSubproject
 from app.models.test_case import TestCase
 from app.models.plugin_config import PluginConfig
+from app.models.user import User
 
 __all__ = [
     "Category",
@@ -12,4 +13,5 @@ __all__ = [
     "ResearchSubproject",
     "TestCase",
     "PluginConfig",
+    "User",
 ]
