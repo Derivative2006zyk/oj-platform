@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     )
     MAX_IMAGE_SIZE: int = 5 * 1024 * 1024
 
+    JWT_SECRET: str = "change-me-in-production"
+    JWT_ALGORITHM: str = "HS256"
+    JWT_EXPIRE_MINUTES: int = 60 * 24 * 7
+
     class Config:
         env_file = ".env"
 
