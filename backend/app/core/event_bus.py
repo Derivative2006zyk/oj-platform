@@ -51,7 +51,17 @@ class EventBus:
         await self._redis.ping()
 
     async def disconnect(self) -> None:
-        """关闭连接与后台任务"""
+        """关闭连接与后台任务。
+
+        顺序：先关 pubsub（让 listen 循环自然退出）→ 再 cancel task → 最后关 redis。
+        """
+        if self._pubsub:
+            try:
+                await self._pubsub.aclose()
+            except Exception:
+                pass
+            self._pubsub = None
+
         if self._listener_task:
             self._listener_task.cancel()
             try:
@@ -60,13 +70,14 @@ class EventBus:
                 pass
             self._listener_task = None
 
-        if self._pubsub:
-            await self._pubsub.aclose()
-            self._pubsub = None
-
         if self._redis:
-            await self._redis.aclose()
+            try:
+                await self._redis.aclose()
+            except Exception:
+                pass
             self._redis = None
+
+        self._handlers.clear()
 
     async def publish(self, channel: str, message: dict) -> None:
         """发布一条事件到指定频道"""
