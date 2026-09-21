@@ -1,18 +1,42 @@
+# backend/app/database.py
+
 import os
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy.pool import NullPool
+from sqlalchemy.pool import AsyncAdaptedQueuePool, NullPool
+
 from app.core.config import settings
 
-# 测试环境下使用 NullPool，避免跨事件循环复用连接导致的问题
-_engine_kwargs = {"echo": False}
-if os.environ.get("TESTING") == "1":
-    _engine_kwargs["poolclass"] = NullPool
 
-engine = create_async_engine(settings.DATABASE_URL, **_engine_kwargs)
+# 测试环境用 NullPool，避免连接跨事件循环复用
+if os.environ.get("TESTING"):
+    _poolclass = NullPool
+else:
+    _poolclass = AsyncAdaptedQueuePool
 
-async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+engine = create_async_engine(
+    settings.DATABASE_URL,
+    echo=False,
+    poolclass=_poolclass,
+)
+
+async_session = async_sessionmaker(
+    engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+)
 
 
 class Base(DeclarativeBase):
     pass
+
+
+async def get_db():
+    async with async_session() as session:
+        yield session
