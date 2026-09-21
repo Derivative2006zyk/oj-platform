@@ -4,6 +4,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.password import hash_password, verify_password
+from app.core.event_bus import get_event_bus
+from app.core.events import EventNames
 from app.models.user import User
 from app.schemas.user import UserRegister
 
@@ -38,6 +40,17 @@ async def create_user(db: AsyncSession, data: UserRegister) -> Optional[User]:
     db.add(user)
     await db.commit()
     await db.refresh(user)
+
+    # 发布注册事件
+    await get_event_bus().publish(
+        EventNames.USER_REGISTERED,
+        {
+            "id": user.id,
+            "username": user.username,
+            "role": user.role,
+        },
+    )
+
     return user
 
 
