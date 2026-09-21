@@ -1,7 +1,7 @@
 # backend/tests/conftest.py
+import asyncio
 import os
 
-# ===== 必须先设置环境变量，再 import 任何 app 模块 =====
 os.environ["TESTING"] = "1"
 os.environ["DATABASE_URL"] = (
     os.environ.get("TEST_DATABASE_URL")
@@ -16,8 +16,7 @@ os.environ["EVENT_BUS_CHANNEL"] = (
     or "oj:events:test"
 )
 
-# ===== 现在可以安全 import app 模块 =====
-import app.models  # noqa: F401  确保所有模型被注册
+import app.models  # noqa: F401
 
 import pytest
 from httpx import AsyncClient, ASGITransport
@@ -58,6 +57,14 @@ async def flush_redis():
     yield
     await r.flushdb()
     await r.aclose()
+
+
+@pytest.fixture(autouse=True)
+def reset_event_bus_between_tests():
+    import app.core.event_bus as eb_module
+    eb_module._event_bus = None
+    yield
+    eb_module._event_bus = None
 
 
 @pytest.fixture
