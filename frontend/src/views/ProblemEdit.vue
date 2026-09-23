@@ -1,5 +1,8 @@
 <template>
   <div class="problem-edit">
+    <p class="login-notice">
+      提示：当前页面走管理员密钥验证。0.2 后续版本将支持 JWT 管理员。
+    </p>
     <h1>{{ isEdit ? '编辑题目' : '录入题目' }}</h1>
 
     <div class="form-group">
@@ -485,7 +488,14 @@ onMounted(async () => {
   margin: 0 auto;
   padding: 20px;
 }
-
+.login-notice {
+  padding: 8px 12px;
+  background: #eff6ff;
+  color: #1e40af;
+  font-size: 13px;
+  border-radius: 4px;
+  margin-bottom: 16px;
+}
 h1 {
   margin-bottom: 20px;
 }
