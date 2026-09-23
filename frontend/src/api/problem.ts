@@ -1,8 +1,4 @@
-import axios from 'axios'
-
-const api = axios.create({
-  baseURL: '/api'
-})
+import api from '../utils/axios'
 
 // 分类
 export interface Category {
