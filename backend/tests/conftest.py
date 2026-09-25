@@ -60,11 +60,18 @@ async def flush_redis():
 
 
 @pytest.fixture(autouse=True)
-def reset_event_bus_between_tests():
+def reset_singletons_between_tests():
+    """每个测试前重置全局单例，避免跨事件循环复用连接。"""
     import app.core.event_bus as eb_module
+    import app.core.task_queue as tq_module
+
     eb_module._event_bus = None
+    tq_module._pool = None
+
     yield
+
     eb_module._event_bus = None
+    tq_module._pool = None
 
 
 @pytest.fixture
