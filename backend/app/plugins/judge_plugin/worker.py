@@ -6,6 +6,7 @@ from app.core.event_bus import get_event_bus
 from app.core.events import EventNames
 from app.plugins.judge_plugin.judge_python import judge_python
 from app.plugins.judge_plugin.judge_java import judge_java
+from app.plugins.judge_plugin.judge_cpp import judge_cpp
 
 
 async def startup(ctx):
@@ -59,6 +60,8 @@ async def judge_submit(ctx, submission_id: int) -> None:
             verdict = judge_python(sub.code, cases)
         elif sub.language == "java":
             verdict = judge_java(sub.code, cases)
+        elif sub.language in ("cpp", "c++", "cpp17"):
+            verdict = judge_cpp(sub.code, cases)
         else:
             verdict = {
                 "status": "RE",
