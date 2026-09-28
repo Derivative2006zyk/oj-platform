@@ -1,323 +1,655 @@
 <template>
-  <div class="problem-detail" v-if="problem">
-    <h1>{{ problem.title }}</h1>
-
-    <div class="meta">
-      <span>难度：{{ '★'.repeat(problem.difficulty) }}</span>
-      <span>题型：{{ typeLabel(problem.type) }}</span>
-      <span v-for="tag in problem.tags" :key="tag" class="tag">{{ tag }}</span>
-    </div>
-
-    <!-- 题目描述 -->
-    <h2>题目描述</h2>
-    <MarkdownRenderer :content="problem.description" />
-
-    <!-- 算法题：示例测试用例 -->
-    <div v-if="problem.type === 'algorithm' && problem.test_cases.length > 0">
-      <h2>示例</h2>
-      <div v-for="(tc, idx) in problem.test_cases" :key="idx" class="test-case">
-        <p><strong>输入：</strong></p>
-        <pre>{{ tc.input_data }}</pre>
-        <p><strong>输出：</strong></p>
-        <pre>{{ tc.expected_output }}</pre>
-      </div>
-    </div>
-
-    <!-- 选择题：选项 -->
-    <div v-if="problem.type === 'choice' && problem.options">
-      <h2>选项</h2>
-      <div v-for="opt in problem.options" :key="opt.key" class="option">
-        <strong>{{ opt.key }}.</strong> {{ opt.content }}
-      </div>
-    </div>
-
-    <!-- 填空题：填空位置 -->
-    <div v-if="problem.type === 'fill_blank' && problem.blanks">
-      <h2>填空</h2>
-      <p>共 {{ problem.blanks.length }} 个空</p>
-    </div>
-
-    <!-- 科研项目：子项目列表 -->
-    <div v-if="problem.type === 'research' && problem.subprojects.length > 0">
-      <h2>子项目（{{ problem.subprojects.length }}个）</h2>
-      <div v-for="(sp, idx) in problem.subprojects" :key="sp.id" class="subproject">
-        <h3>子项目{{ idx + 1 }}：{{ sp.title }}</h3>
-        <MarkdownRenderer :content="sp.description" />
-
-        <div v-if="sp.hint" class="hint">
-          <strong>思路提示：</strong>
-          <MarkdownRenderer :content="sp.hint" />
+  <div class="problem-detail">
+    <div v-if="loading" class="loading">加载中...</div>
+    <div v-else-if="!problem" class="not-found">题目不存在</div>
+    <div v-else class="content">
+      <!-- ===== 标题区 ===== -->
+      <div class="header">
+        <h1>{{ problem.title }}</h1>
+        <div class="meta">
+          <span class="badge">ID: {{ problem.id }}</span>
+          <span class="badge">分类: {{ categoryName }}</span>
+          <span class="badge">题型: {{ typeLabel }}</span>
+          <span class="badge">难度: {{ '★'.repeat(problem.difficulty) }}</span>
         </div>
+        <div v-if="problem.tags && problem.tags.length" class="tags">
+          <span v-for="t in problem.tags" :key="t" class="tag">{{ t }}</span>
+        </div>
+      </div>
 
-        <div v-if="sp.reference_links.length > 0" class="refs">
-          <strong>参考资源：</strong>
-          <div v-for="(ref, i) in sp.reference_links" :key="i" class="ref-item">
-            <a :href="ref.url" target="_blank" rel="noopener noreferrer">{{ ref.title }}</a>
-            <span v-if="ref.note" class="ref-note"> - {{ ref.note }}</span>
+      <!-- ===== 题目描述 ===== -->
+      <section class="section">
+        <h2>题目描述</h2>
+        <MarkdownRenderer :content="problem.description" />
+      </section>
+
+      <!-- ===== 选择题选项 ===== -->
+      <section v-if="problem.type === 'choice' && problem.options" class="section">
+        <h2>选项</h2>
+        <div class="options">
+          <div v-for="(opt, idx) in problem.options" :key="idx" class="option">
+            <span class="key">{{ opt.key || String.fromCharCode(65 + idx) }}.</span>
+            <span>{{ opt.content }}</span>
           </div>
         </div>
+      </section>
+
+      <!-- ===== 填空题 ===== -->
+      <section v-if="problem.type === 'fill_blank' && problem.blanks" class="section">
+        <h2>空位</h2>
+        <div class="blanks">
+          <div v-for="(b, idx) in problem.blanks" :key="idx" class="blank">
+            <span>第 {{ b.blank_index || idx + 1 }} 空</span>
+            <span v-if="b.match_rule" class="rule">匹配: {{ b.match_rule }}</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== 算法题示例 ===== -->
+      <section v-if="problem.type === 'algorithm' && problem.test_cases && problem.test_cases.length" class="section">
+        <h2>示例</h2>
+        <div v-for="(tc, idx) in problem.test_cases" :key="idx" class="test-case">
+          <div class="tc-title">示例 {{ idx + 1 }}</div>
+          <div class="tc-block">
+            <div class="tc-label">输入</div>
+            <pre>{{ tc.input_data }}</pre>
+          </div>
+          <div class="tc-block">
+            <div class="tc-label">输出</div>
+            <pre>{{ tc.expected_output }}</pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== 科研题子项目 ===== -->
+      <section v-if="problem.type === 'research' && problem.subprojects && problem.subprojects.length" class="section">
+        <h2>子项目</h2>
+        <div v-for="(sp, idx) in problem.subprojects" :key="idx" class="subproject">
+          <h3>{{ sp.sort_order }}. {{ sp.title }}</h3>
+          <MarkdownRenderer :content="sp.description" />
+          <p v-if="sp.hint" class="hint">提示：{{ sp.hint }}</p>
+        </div>
+      </section>
+
+      <!-- ===== 答案 ===== -->
+      <section class="section">
+        <div class="section-header">
+          <h2>答案</h2>
+          <button v-if="!answerVisible" class="btn-secondary" @click="showAnswer">
+            查看答案
+          </button>
+        </div>
+        <div v-if="answerVisible" class="answer-box">
+          <div v-if="answer && answer.answer">
+            <h4>参考答案</h4>
+            <MarkdownRenderer :content="answer.answer" />
+          </div>
+          <div v-if="answer && answer.explanation">
+            <h4>解析</h4>
+            <MarkdownRenderer :content="answer.explanation" />
+          </div>
+          <div v-if="!answer || (!answer.answer && !answer.explanation)" class="empty">
+            暂无答案
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== 代码提交面板 ===== -->
+      <section v-if="problem.type === 'algorithm'" class="section submit-section">
+        <h2>提交代码</h2>
+
+        <div v-if="!userStore.isLoggedIn" class="login-tip">
+          请先 <router-link to="/login">登录</router-link> 后提交
+        </div>
+
+        <template v-else>
+          <div class="form-row">
+            <label>语言：</label>
+            <select v-model="submitPanel.language">
+              <option value="python">Python 3</option>
+              <option value="java">Java 17</option>
+              <option value="cpp">C++ 17</option>
+            </select>
+          </div>
+
+          <textarea
+            v-model="submitPanel.code"
+            class="code-input"
+            placeholder="在此粘贴代码..."
+            rows="14"
+          ></textarea>
+
+          <div v-if="submitError" class="error">{{ submitError }}</div>
+
+          <button
+            class="btn-primary"
+            :disabled="submitting || !submitPanel.code.trim()"
+            @click="onSubmit"
+          >
+            {{ submitting ? '提交中...' : '提交' }}
+          </button>
+
+          <!-- 提交结果 -->
+          <div v-if="currentSubmission" class="submission-result">
+            <div class="result-row">
+              <span>状态：</span>
+              <span :class="['status-badge', `status-${currentSubmission.status}`]">
+                {{ statusLabel(currentSubmission.status) }}
+              </span>
+            </div>
+            <div class="result-row">
+              <span>测试点：</span>
+              <span>{{ currentSubmission.passed_cases }} / {{ currentSubmission.total_cases }}</span>
+            </div>
+            <div v-if="currentSubmission.runtime_ms !== null && currentSubmission.runtime_ms !== undefined" class="result-row">
+              <span>耗时：</span>
+              <span>{{ currentSubmission.runtime_ms }} ms</span>
+            </div>
+            <pre v-if="currentSubmission.error_message" class="error-message">{{ currentSubmission.error_message }}</pre>
+          </div>
+        </template>
+      </section>
+
+      <!-- ===== 操作按钮 ===== -->
+      <div class="actions">
+        <router-link class="btn-secondary" to="/">返回列表</router-link>
       </div>
-    </div>
-
-    <!-- 查看答案 -->
-    <button @click="toggleAnswer" class="answer-btn">
-      {{ showAnswer ? '隐藏答案' : '查看答案' }}
-    </button>
-
-    <div v-if="showAnswer && answer" class="answer-block">
-      <h2>答案</h2>
-      <MarkdownRenderer :content="answer.answer || '（无答案）'" />
-
-      <div v-if="answer.explanation">
-        <h2>解析</h2>
-        <MarkdownRenderer :content="answer.explanation" />
-      </div>
-    </div>
-
-    <!-- 操作按钮 -->
-    <div class="actions">
-      <button @click="goEdit" class="edit-btn">编辑</button>
-      <button @click="handleDelete" class="delete-btn">删除</button>
-      <button @click="goBack" class="back-btn">返回列表</button>
     </div>
   </div>
-
-  <div v-else class="loading">加载中...</div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import {
-  getProblemDetail,
-  getProblemAnswer,
-  deleteProblem,
-  type ProblemDetail
-} from '../api/problem'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { useRoute } from 'vue-router'
+
 import MarkdownRenderer from '../components/MarkdownRenderer.vue'
+import { getProblemDetail, getProblemAnswer, type ProblemDetail } from '../api/problem'
+import { submitCode, type SubmissionDetail } from '../api/submission'
+import { openSubmissionWS, type SubmissionWSHandle, type WSMessage } from '../utils/ws'
+import { useUserStore } from '../stores/user'
 
 const route = useRoute()
-const router = useRouter()
+const userStore = useUserStore()
 
+const problemId = computed(() => Number(route.params.id))
+
+const loading = ref(true)
 const problem = ref<ProblemDetail | null>(null)
-const answer = ref<{ answer: string; explanation: string } | null>(null)
-const showAnswer = ref(false)
 
-const typeMap: Record<string, string> = {
-  algorithm: '算法题',
-  choice: '选择题',
-  fill_blank: '填空题',
-  proof: '证明题',
-  research: '科研项目'
-}
+const answer = ref<{ answer?: string | null; explanation?: string | null } | null>(null)
+const answerVisible = ref(false)
 
-function typeLabel(type: string): string {
-  return typeMap[type] || type
-}
-
-onMounted(async () => {
-  const id = Number(route.params.id)
-  if (isNaN(id)) {
-    router.push('/')
-    return
-  }
-  try {
-    problem.value = await getProblemDetail(id)
-  } catch (e) {
-    alert('题目不存在')
-    router.push('/')
-  }
+// ===== 提交面板状态 =====
+const submitPanel = reactive({
+  language: 'python',
+  code: '',
 })
 
-// 查看/隐藏答案
-async function toggleAnswer() {
-  if (!showAnswer.value && !answer.value) {
-    const id = Number(route.params.id)
-    try {
-      answer.value = await getProblemAnswer(id)
-    } catch (e) {
-      alert('获取答案失败')
-      return
-    }
+const submitting = ref(false)
+const submitError = ref('')
+const currentSubmission = ref<SubmissionDetail | null>(null)
+const wsHandle = ref<SubmissionWSHandle | null>(null)
+
+const categoryNames: Record<number, string> = {
+  1: '算法',
+  2: '数学',
+  3: '物理',
+  4: '英语',
+  5: '其他',
+}
+
+const categoryName = computed(() => {
+  if (!problem.value) return ''
+  return categoryNames[problem.value.category_id] || `#${problem.value.category_id}`
+})
+
+const typeLabels: Record<string, string> = {
+  algorithm: '算法',
+  choice: '选择',
+  fill_blank: '填空',
+  proof: '证明',
+  research: '科研',
+}
+
+const typeLabel = computed(() => {
+  if (!problem.value) return ''
+  return typeLabels[problem.value.type] || problem.value.type
+})
+
+function statusLabel(status: string): string {
+  const map: Record<string, string> = {
+    PENDING: '排队中',
+    AC: '通过',
+    WA: '答案错误',
+    TLE: '时间超限',
+    MLE: '内存超限',
+    RE: '运行错误',
+    CE: '编译错误',
   }
-  showAnswer.value = !showAnswer.value
+  return map[status] || status
 }
 
-// 编辑
-function goEdit() {
-  router.push(`/admin/problem/${route.params.id}/edit`)
-}
-
-// 删除
-async function handleDelete() {
-  if (!confirm('确定删除这道题吗？此操作不可撤销')) return
+async function loadProblem() {
+  loading.value = true
   try {
-    await deleteProblem(Number(route.params.id))
-    alert('删除成功')
-    router.push('/')
-  } catch (e: any) {
-    alert('删除失败：' + (e.response?.data?.detail || e.message))
+    const data = await getProblemDetail(problemId.value)
+    problem.value = data
+  } catch (e) {
+    console.error('加载题目失败', e)
+    problem.value = null
+  } finally {
+    loading.value = false
   }
 }
 
-// 返回列表
-function goBack() {
-  router.push('/')
+async function showAnswer() {
+  try {
+    const data = await getProblemAnswer(problemId.value)
+    answer.value = data
+    answerVisible.value = true
+  } catch (e) {
+    console.error('加载答案失败', e)
+  }
 }
+
+async function onSubmit() {
+  submitError.value = ''
+
+  if (!userStore.isLoggedIn) {
+    submitError.value = '请先登录'
+    return
+  }
+
+  if (!submitPanel.code.trim()) {
+    submitError.value = '代码不能为空'
+    return
+  }
+
+  submitting.value = true
+
+  try {
+    const sub = await submitCode({
+      problem_id: problemId.value,
+      code: submitPanel.code,
+      language: submitPanel.language,
+    })
+
+    currentSubmission.value = sub
+    openWS(sub.id)
+  } catch (e: any) {
+    const status = e?.response?.status
+    if (status === 401) {
+      submitError.value = '登录已过期，请重新登录'
+    } else {
+      submitError.value = e?.response?.data?.detail || '提交失败，请稍后重试'
+    }
+  } finally {
+    submitting.value = false
+  }
+}
+
+function openWS(submissionId: number) {
+  // 关旧连接
+  if (wsHandle.value) {
+    wsHandle.value.close()
+    wsHandle.value = null
+  }
+
+  wsHandle.value = openSubmissionWS(
+    submissionId,
+    (msg: WSMessage) => {
+      if (!currentSubmission.value) return
+      if (msg.submission_id !== currentSubmission.value.id) return
+
+      currentSubmission.value = {
+        ...currentSubmission.value,
+        status: msg.status,
+        passed_cases: msg.passed_cases ?? currentSubmission.value.passed_cases,
+        total_cases: msg.total_cases ?? currentSubmission.value.total_cases,
+        runtime_ms: msg.runtime_ms ?? currentSubmission.value.runtime_ms,
+      }
+
+      if (msg.type === 'judged') {
+        if (wsHandle.value) {
+          wsHandle.value.close()
+          wsHandle.value = null
+        }
+      }
+    },
+    (e) => {
+      console.warn('WS error', e)
+    }
+  )
+}
+
+onMounted(() => {
+  loadProblem()
+})
+
+onUnmounted(() => {
+  if (wsHandle.value) {
+    wsHandle.value.close()
+    wsHandle.value = null
+  }
+})
 </script>
 
 <style scoped>
 .problem-detail {
-  max-width: 800px;
+  max-width: 900px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 24px;
 }
 
-h1 {
-  margin-bottom: 15px;
+.loading,
+.not-found {
+  text-align: center;
+  padding: 60px 0;
+  color: #666;
 }
 
-h2 {
-  margin-top: 25px;
-  margin-bottom: 10px;
-  padding-bottom: 5px;
+.header {
+  margin-bottom: 24px;
+  padding-bottom: 16px;
   border-bottom: 1px solid #e5e7eb;
 }
 
-h3 {
-  margin-top: 15px;
-  margin-bottom: 8px;
+.header h1 {
+  margin: 0 0 12px;
+  font-size: 24px;
 }
 
 .meta {
   display: flex;
-  gap: 10px;
-  align-items: center;
-  margin-bottom: 15px;
   flex-wrap: wrap;
-  color: #4b5563;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  background: #f3f4f6;
+  color: #374151;
+  font-size: 12px;
+  border-radius: 3px;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .tag {
-  background: #e5e7eb;
   padding: 2px 8px;
-  border-radius: 10px;
+  background: #eff6ff;
+  color: #1e40af;
+  font-size: 12px;
+  border-radius: 3px;
+}
+
+.section {
+  margin-bottom: 32px;
+  padding: 16px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.section h2 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.section-header h2 {
+  margin: 0;
+}
+
+.options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.option {
+  padding: 8px 12px;
+  background: #f9fafb;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.option .key {
+  font-weight: 600;
+  margin-right: 8px;
+}
+
+.blanks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.blank {
+  display: flex;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.blank .rule {
+  color: #666;
   font-size: 12px;
 }
 
 .test-case {
-  background: #f9fafb;
-  padding: 10px;
-  border-radius: 6px;
-  margin: 10px 0;
+  margin-bottom: 16px;
 }
 
-.test-case pre {
-  background: #f0f0f0;
-  padding: 10px;
+.tc-title {
+  font-weight: 600;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.tc-block {
+  margin-bottom: 8px;
+}
+
+.tc-label {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 4px;
+}
+
+.tc-block pre {
+  margin: 0;
+  padding: 8px 12px;
+  background: #1f2937;
+  color: #f9fafb;
   border-radius: 4px;
+  font-size: 12px;
   overflow-x: auto;
-  margin: 5px 0;
-}
-
-.option {
-  padding: 10px;
-  border-bottom: 1px solid #eee;
 }
 
 .subproject {
-  background: #f9fafb;
-  padding: 15px;
-  border-radius: 8px;
-  margin: 15px 0;
+  margin-bottom: 20px;
+  padding-left: 12px;
+  border-left: 3px solid #4f46e5;
 }
 
-.hint {
+.subproject h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.subproject .hint {
+  margin-top: 8px;
+  padding: 6px 10px;
   background: #fef3c7;
-  padding: 10px;
-  border-radius: 6px;
-  margin-top: 10px;
-}
-
-.refs {
-  margin-top: 10px;
-}
-
-.ref-item {
-  margin: 5px 0;
-}
-
-.ref-note {
-  color: #6b7280;
+  color: #92400e;
   font-size: 13px;
+  border-radius: 4px;
 }
 
-.answer-btn {
-  margin-top: 20px;
-  padding: 10px 20px;
-  background: #16a34a;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
+.answer-box {
+  padding: 12px;
+  background: #f9fafb;
+  border-radius: 4px;
+}
+
+.answer-box h4 {
+  margin: 12px 0 8px;
   font-size: 15px;
 }
 
-.answer-btn:hover {
-  background: #15803d;
+.answer-box h4:first-child {
+  margin-top: 0;
 }
 
-.answer-block {
-  margin-top: 15px;
-  padding: 15px;
-  background: #f0fdf4;
-  border-radius: 8px;
-  border-left: 4px solid #16a34a;
+.answer-box .empty {
+  color: #999;
+  text-align: center;
+  padding: 20px;
+}
+
+/* ===== 提交面板 ===== */
+.submit-section {
+  margin-bottom: 32px;
+}
+
+.login-tip {
+  padding: 12px;
+  background: #fef3c7;
+  color: #92400e;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.login-tip a {
+  color: #4f46e5;
+  font-weight: 600;
+}
+
+.form-row {
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.form-row select {
+  padding: 6px 10px;
+  border: 1px solid #d0d5dd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.code-input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #d0d5dd;
+  border-radius: 4px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  box-sizing: border-box;
+  resize: vertical;
+  outline: none;
+}
+
+.code-input:focus {
+  border-color: #4f46e5;
+}
+
+.btn-primary {
+  margin-top: 12px;
+  padding: 8px 24px;
+  background: #4f46e5;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.btn-primary:disabled {
+  background: #a5b4fc;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  padding: 6px 14px;
+  background: white;
+  color: #374151;
+  border: 1px solid #d0d5dd;
+  border-radius: 4px;
+  font-size: 13px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  border-color: #4f46e5;
+  color: #4f46e5;
+}
+
+.error {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 13px;
+  border-radius: 4px;
+}
+
+.submission-result {
+  margin-top: 16px;
+  padding: 12px;
+  background: #f9fafb;
+  border-radius: 4px;
+}
+
+.result-row {
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 3px;
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.status-PENDING { background: #e5e7eb; color: #374151; }
+.status-AC { background: #d1fae5; color: #065f46; }
+.status-WA { background: #fee2e2; color: #991b1b; }
+.status-TLE { background: #fef3c7; color: #92400e; }
+.status-MLE { background: #fef3c7; color: #92400e; }
+.status-RE { background: #fee2e2; color: #991b1b; }
+.status-CE { background: #fee2e2; color: #991b1b; }
+
+.error-message {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #1f2937;
+  color: #f9fafb;
+  font-size: 12px;
+  border-radius: 4px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  max-height: 200px;
+  overflow-y: auto;
 }
 
 .actions {
-  margin-top: 30px;
   display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.actions button {
-  padding: 10px 20px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  color: white;
-}
-
-.edit-btn {
-  background: #2563eb;
-}
-
-.edit-btn:hover {
-  background: #1d4ed8;
-}
-
-.delete-btn {
-  background: #dc2626;
-}
-
-.delete-btn:hover {
-  background: #b91c1c;
-}
-
-.back-btn {
-  background: #6b7280;
-}
-
-.back-btn:hover {
-  background: #4b5563;
-}
-
-.loading {
-  text-align: center;
-  padding: 50px;
-  color: #9ca3af;
+  gap: 12px;
+  margin-top: 24px;
 }
 </style>
