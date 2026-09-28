@@ -8,17 +8,19 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: 'http://localhost:8000',
-        changeOrigin: true
-      }
-    }
+        changeOrigin: true,
+        ws: true,  // 启用 WebSocket 代理
+      },
+    },
   },
   preview: {
     port: 4173,
     proxy: {
       '/api': {
         target: 'http://localhost:8000',
-        changeOrigin: true
-      }
-    }
-  }
+        changeOrigin: true,
+        ws: true,
+      },
+    },
+  },
 })
