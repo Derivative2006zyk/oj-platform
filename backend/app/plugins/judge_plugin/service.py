@@ -38,10 +38,18 @@ async def list_submissions_for_user(
     user_id: int,
     page: int = 1,
     page_size: int = 20,
+    status: Optional[str] = None,
+    problem_id: Optional[int] = None,
 ) -> dict:
+    from sqlalchemy import func
+
     query = select(Submission).where(Submission.user_id == user_id)
 
-    from sqlalchemy import func
+    if status:
+        query = query.where(Submission.status == status)
+    if problem_id:
+        query = query.where(Submission.problem_id == problem_id)
+
     count_query = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_query)).scalar()
 
