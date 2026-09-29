@@ -62,3 +62,58 @@ async def authenticate(db: AsyncSession, username: str, password: str) -> Option
     if not verify_password(password, user.hashed_password):
         return None
     return user
+
+async def change_password(
+    db: AsyncSession,
+    user: User,
+    old_password: str,
+    new_password: str,
+) -> bool:
+    from app.core.password import hash_password, verify_password
+
+    if not verify_password(old_password, user.hashed_password):
+        return False
+
+    user.hashed_password = hash_password(new_password)
+    await db.commit()
+    return True
+
+
+async def get_user_stats(db: AsyncSession, user_id: int) -> dict:
+    from sqlalchemy import func, distinct
+    from app.models.submission import Submission
+
+    total = (await db.execute(
+        select(func.count()).where(Submission.user_id == user_id)
+    )).scalar() or 0
+
+    accepted = (await db.execute(
+        select(func.count()).where(
+            Submission.user_id == user_id,
+            Submission.status == "AC",
+        )
+    )).scalar() or 0
+
+    solved = (await db.execute(
+        select(func.count(distinct(Submission.problem_id))).where(
+            Submission.user_id == user_id,
+            Submission.status == "AC",
+        )
+    )).scalar() or 0
+
+    lang_rows = (await db.execute(
+        select(Submission.language, func.count())
+        .where(Submission.user_id == user_id)
+        .group_by(Submission.language)
+    )).all()
+    language_distribution = {lang: cnt for lang, cnt in lang_rows}
+
+    acceptance_rate = (accepted / total * 100) if total > 0 else 0.0
+
+    return {
+        "total_submissions": total,
+        "accepted_submissions": accepted,
+        "solved_problems": solved,
+        "acceptance_rate": round(acceptance_rate, 2),
+        "language_distribution": language_distribution,
+    }

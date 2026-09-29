@@ -29,3 +29,15 @@ class UserResponse(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+class ChangePassword(BaseModel):
+    old_password: str = Field(min_length=1, max_length=100)
+    new_password: str = Field(min_length=6, max_length=100)
+
+
+class UserStats(BaseModel):
+    total_submissions: int
+    accepted_submissions: int
+    solved_problems: int
+    acceptance_rate: float
+    language_distribution: dict

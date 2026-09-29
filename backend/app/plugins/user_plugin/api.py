@@ -8,10 +8,12 @@ from app.core.events import EventNames
 from app.database import get_db
 from app.models.user import User
 from app.schemas.user import (
+    ChangePassword,
     TokenResponse,
     UserLogin,
     UserRegister,
     UserResponse,
+    UserStats,
 )
 from app.plugins.user_plugin import service
 
@@ -63,3 +65,27 @@ async def login(data: UserLogin, db: AsyncSession = Depends(get_db)):
 @router.get("/users/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
     return current_user
+
+@router.put("/users/me/password")
+async def change_password(
+    data: ChangePassword,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    ok = await service.change_password(
+        db, current_user, data.old_password, data.new_password
+    )
+    if not ok:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Old password is incorrect",
+        )
+    return {"message": "Password updated"}
+
+
+@router.get("/users/me/stats", response_model=UserStats)
+async def get_my_stats(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return await service.get_user_stats(db, current_user.id)
