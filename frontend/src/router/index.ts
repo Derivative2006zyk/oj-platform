@@ -36,6 +36,18 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/ProblemEdit.vue'),
     meta: { requiresAuth: true },
   },
+    {
+    path: '/submissions',
+    name: 'submission-list',
+    component: () => import('../views/SubmissionList.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/profile',
+    name: 'profile',
+    component: () => import('../views/Profile.vue'),
+    meta: { requiresAuth: true },
+  },
 ]
 
 const router = createRouter({

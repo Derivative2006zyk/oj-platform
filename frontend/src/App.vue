@@ -10,21 +10,25 @@ import NavBar from './components/NavBar.vue'
 </script>
 
 <style>
-/* 全局重置 */
-* {
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
   box-sizing: border-box;
 }
 
-html, body {
-  margin: 0;
-  padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
-    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
-  background: #f5f7fa;
-  color: #1f2937;
+body {
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-body);
+  color: var(--color-text-primary);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  background-color: var(--color-bg-page);
 }
 
 a {
   color: inherit;
+  text-decoration: none;
 }
 </style>
