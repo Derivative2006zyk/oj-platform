@@ -1,161 +1,205 @@
 <template>
-  <div class="problem-detail">
+  <main class="problem-page">
     <div v-if="loading" class="loading">加载中...</div>
     <div v-else-if="!problem" class="not-found">题目不存在</div>
-    <div v-else class="content">
-      <!-- ===== 标题区 ===== -->
-      <div class="header">
-        <h1>{{ problem.title }}</h1>
-        <div class="meta">
-          <span class="badge">ID: {{ problem.id }}</span>
-          <span class="badge">分类: {{ categoryName }}</span>
-          <span class="badge">题型: {{ typeLabel }}</span>
-          <span class="badge">难度: {{ '★'.repeat(problem.difficulty) }}</span>
-        </div>
-        <div v-if="problem.tags && problem.tags.length" class="tags">
-          <span v-for="t in problem.tags" :key="t" class="tag">{{ t }}</span>
-        </div>
-      </div>
 
-      <!-- ===== 题目描述 ===== -->
-      <section class="section">
-        <h2>题目描述</h2>
-        <MarkdownRenderer :content="problem.description" />
-      </section>
+    <div v-else class="content-wrapper">
+      <!-- ========== 左栏：题目描述 ========== -->
+      <div class="left-col">
+        <article class="card problem-card">
+          <header class="problem-header">
+            <h1 class="title">{{ problem.title }}</h1>
+            <div class="meta">
+              <span class="tag">ID: {{ problem.id }}</span>
+              <span class="tag">分类: {{ categoryName }}</span>
+              <span class="tag">题型: {{ typeLabel }}</span>
+              <span class="tag">难度: {{ '★'.repeat(problem.difficulty) }}</span>
+            </div>
+            <div v-if="problem.tags && problem.tags.length" class="tags">
+              <span v-for="t in problem.tags" :key="t" class="tag-pill">{{ t }}</span>
+            </div>
+          </header>
 
-      <!-- ===== 选择题选项 ===== -->
-      <section v-if="problem.type === 'choice' && problem.options" class="section">
-        <h2>选项</h2>
-        <div class="options">
-          <div v-for="(opt, idx) in problem.options" :key="idx" class="option">
-            <span class="key">{{ opt.key || String.fromCharCode(65 + idx) }}.</span>
-            <span>{{ opt.content }}</span>
-          </div>
-        </div>
-      </section>
+          <!-- 题目描述 -->
+          <section class="desc-section">
+            <h2>题目描述</h2>
+            <MarkdownRenderer :content="problem.description" />
+          </section>
 
-      <!-- ===== 填空题 ===== -->
-      <section v-if="problem.type === 'fill_blank' && problem.blanks" class="section">
-        <h2>空位</h2>
-        <div class="blanks">
-          <div v-for="(b, idx) in problem.blanks" :key="idx" class="blank">
-            <span>第 {{ b.blank_index || idx + 1 }} 空</span>
-            <span v-if="b.match_rule" class="rule">匹配: {{ b.match_rule }}</span>
-          </div>
-        </div>
-      </section>
+          <!-- 选择题 -->
+          <section v-if="problem.type === 'choice' && problem.options" class="desc-section">
+            <h2>选项</h2>
+            <div class="options">
+              <div v-for="(opt, idx) in problem.options" :key="idx" class="option">
+                <span class="option-key">{{ opt.key || String.fromCharCode(65 + idx) }}.</span>
+                <span>{{ opt.content }}</span>
+              </div>
+            </div>
+          </section>
 
-      <!-- ===== 算法题示例 ===== -->
-      <section v-if="problem.type === 'algorithm' && problem.test_cases && problem.test_cases.length" class="section">
-        <h2>示例</h2>
-        <div v-for="(tc, idx) in problem.test_cases" :key="idx" class="test-case">
-          <div class="tc-title">示例 {{ idx + 1 }}</div>
-          <div class="tc-block">
-            <div class="tc-label">输入</div>
-            <pre>{{ tc.input_data }}</pre>
-          </div>
-          <div class="tc-block">
-            <div class="tc-label">输出</div>
-            <pre>{{ tc.expected_output }}</pre>
-          </div>
-        </div>
-      </section>
+          <!-- 填空题 -->
+          <section v-if="problem.type === 'fill_blank' && problem.blanks" class="desc-section">
+            <h2>空位</h2>
+            <div class="blanks">
+              <div v-for="(b, idx) in problem.blanks" :key="idx" class="blank">
+                <span>第 {{ b.blank_index || idx + 1 }} 空</span>
+                <span v-if="b.match_rule" class="blank-rule">匹配: {{ b.match_rule }}</span>
+              </div>
+            </div>
+          </section>
 
-      <!-- ===== 科研题子项目 ===== -->
-      <section v-if="problem.type === 'research' && problem.subprojects && problem.subprojects.length" class="section">
-        <h2>子项目</h2>
-        <div v-for="(sp, idx) in problem.subprojects" :key="idx" class="subproject">
-          <h3>{{ sp.sort_order }}. {{ sp.title }}</h3>
-          <MarkdownRenderer :content="sp.description" />
-          <p v-if="sp.hint" class="hint">提示：{{ sp.hint }}</p>
-        </div>
-      </section>
-
-      <!-- ===== 答案 ===== -->
-      <section class="section">
-        <div class="section-header">
-          <h2>答案</h2>
-          <button v-if="!answerVisible" class="btn-secondary" @click="showAnswer">
-            查看答案
-          </button>
-        </div>
-        <div v-if="answerVisible" class="answer-box">
-          <div v-if="answer && answer.answer">
-            <h4>参考答案</h4>
-            <MarkdownRenderer :content="answer.answer" />
-          </div>
-          <div v-if="answer && answer.explanation">
-            <h4>解析</h4>
-            <MarkdownRenderer :content="answer.explanation" />
-          </div>
-          <div v-if="!answer || (!answer.answer && !answer.explanation)" class="empty">
-            暂无答案
-          </div>
-        </div>
-      </section>
-
-      <!-- ===== 代码提交面板 ===== -->
-      <section v-if="problem.type === 'algorithm'" class="section submit-section">
-        <h2>提交代码</h2>
-
-        <div v-if="!userStore.isLoggedIn" class="login-tip">
-          请先 <router-link to="/login">登录</router-link> 后提交
-        </div>
-
-        <template v-else>
-          <div class="form-row">
-            <label>语言：</label>
-            <select v-model="submitPanel.language">
-              <option value="python">Python 3</option>
-              <option value="java">Java 17</option>
-              <option value="cpp">C++ 17</option>
-            </select>
-          </div>
-
-          <textarea
-            v-model="submitPanel.code"
-            class="code-input"
-            placeholder="在此粘贴代码..."
-            rows="14"
-          ></textarea>
-
-          <div v-if="submitError" class="error">{{ submitError }}</div>
-
-          <button
-            class="btn-primary"
-            :disabled="submitting || !submitPanel.code.trim()"
-            @click="onSubmit"
+          <!-- 算法题示例 -->
+          <section
+            v-if="problem.type === 'algorithm' && problem.test_cases && problem.test_cases.length"
+            class="desc-section"
           >
-            {{ submitting ? '提交中...' : '提交' }}
-          </button>
+            <h2>样例</h2>
+            <div class="sample-card">
+              <div
+                v-for="(tc, idx) in problem.test_cases"
+                :key="idx"
+                class="sample-group"
+              >
+                <div class="sample-column">
+                  <div class="sample-label">输入 #{{ idx + 1 }}</div>
+                  <pre class="sample-content">{{ tc.input_data }}</pre>
+                </div>
+                <div class="sample-column">
+                  <div class="sample-label">输出 #{{ idx + 1 }}</div>
+                  <pre class="sample-content">{{ tc.expected_output }}</pre>
+                </div>
+              </div>
+            </div>
+          </section>
 
-          <!-- 提交结果 -->
-          <div v-if="currentSubmission" class="submission-result">
-            <div class="result-row">
-              <span>状态：</span>
-              <span :class="['status-badge', `status-${currentSubmission.status}`]">
-                {{ statusLabel(currentSubmission.status) }}
-              </span>
+          <!-- 科研题 -->
+          <section
+            v-if="problem.type === 'research' && problem.subprojects && problem.subprojects.length"
+            class="desc-section"
+          >
+            <h2>子项目</h2>
+            <div v-for="(sp, idx) in problem.subprojects" :key="idx" class="subproject">
+              <h3>{{ sp.sort_order }}. {{ sp.title }}</h3>
+              <MarkdownRenderer :content="sp.description" />
+              <p v-if="sp.hint" class="subproject-hint">提示：{{ sp.hint }}</p>
             </div>
-            <div class="result-row">
-              <span>测试点：</span>
-              <span>{{ currentSubmission.passed_cases }} / {{ currentSubmission.total_cases }}</span>
-            </div>
-            <div v-if="currentSubmission.runtime_ms !== null && currentSubmission.runtime_ms !== undefined" class="result-row">
-              <span>耗时：</span>
-              <span>{{ currentSubmission.runtime_ms }} ms</span>
-            </div>
-            <pre v-if="currentSubmission.error_message" class="error-message">{{ currentSubmission.error_message }}</pre>
-          </div>
-        </template>
-      </section>
+          </section>
 
-      <!-- ===== 操作按钮 ===== -->
-      <div class="actions">
-        <router-link class="btn-secondary" to="/">返回列表</router-link>
+          <!-- 答案 -->
+          <section class="desc-section answer-section">
+            <div class="section-header">
+              <h2>答案</h2>
+              <button v-if="!answerVisible" class="btn-ghost" @click="showAnswer">
+                查看答案
+              </button>
+            </div>
+            <div v-if="answerVisible" class="answer-box">
+              <div v-if="answer && answer.answer">
+                <h4>参考答案</h4>
+                <MarkdownRenderer :content="answer.answer" />
+              </div>
+              <div v-if="answer && answer.explanation">
+                <h4>解析</h4>
+                <MarkdownRenderer :content="answer.explanation" />
+              </div>
+              <div v-if="!answer || (!answer.answer && !answer.explanation)" class="empty">
+                暂无答案
+              </div>
+            </div>
+          </section>
+        </article>
       </div>
+
+      <!-- ========== 右栏：提交面板 ========== -->
+      <aside class="right-col">
+        <!-- 提交面板 -->
+        <div v-if="problem.type === 'algorithm'" class="card submit-panel">
+          <div class="card-header">
+            <span>代码提交</span>
+          </div>
+
+          <div v-if="!userStore.isLoggedIn" class="login-tip">
+            请先 <router-link to="/login">登录</router-link> 后提交
+          </div>
+
+          <template v-else>
+            <div class="form-row">
+              <label>语言</label>
+              <select v-model="submitPanel.language" class="lang-select">
+                <option value="python">Python 3</option>
+                <option value="java">Java 17</option>
+                <option value="cpp">C++ 17</option>
+              </select>
+            </div>
+
+            <textarea
+              v-model="submitPanel.code"
+              class="code-input"
+              placeholder="// 在此输入代码..."
+              rows="14"
+            ></textarea>
+
+            <div v-if="submitError" class="error">{{ submitError }}</div>
+
+            <button
+              class="btn-primary"
+              :disabled="submitting || !submitPanel.code.trim()"
+              @click="onSubmit"
+            >
+              {{ submitting ? '提交中...' : '提交' }}
+            </button>
+
+            <!-- 判题结果 -->
+            <div v-if="currentSubmission" class="submission-result">
+              <div class="result-row">
+                <span class="result-label">状态</span>
+                <span :class="['status-badge', `status-${currentSubmission.status}`]">
+                  {{ statusLabel(currentSubmission.status) }}
+                </span>
+              </div>
+              <div class="result-row">
+                <span class="result-label">测试点</span>
+                <span>{{ currentSubmission.passed_cases }} / {{ currentSubmission.total_cases }}</span>
+              </div>
+              <div
+                v-if="currentSubmission.runtime_ms !== null && currentSubmission.runtime_ms !== undefined"
+                class="result-row"
+              >
+                <span class="result-label">耗时</span>
+                <span>{{ currentSubmission.runtime_ms }} ms</span>
+              </div>
+              <pre
+                v-if="currentSubmission.error_message"
+                class="error-message"
+              >{{ currentSubmission.error_message }}</pre>
+            </div>
+          </template>
+        </div>
+
+        <!-- 题目信息 -->
+        <div class="card info-card">
+          <div class="card-header">
+            <span>题目信息</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">分类</span>
+            <span class="info-value">{{ categoryName }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">题型</span>
+            <span class="info-value">{{ typeLabel }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">难度</span>
+            <span class="info-value">{{ '★'.repeat(problem.difficulty) }}</span>
+          </div>
+        </div>
+
+        <!-- 返回 -->
+        <router-link to="/" class="back-link">← 返回题目列表</router-link>
+      </aside>
     </div>
-  </div>
+  </main>
 </template>
 
 <script setup lang="ts">
@@ -204,11 +248,11 @@ const categoryName = computed(() => {
 })
 
 const typeLabels: Record<string, string> = {
-  algorithm: '算法',
-  choice: '选择',
-  fill_blank: '填空',
-  proof: '证明',
-  research: '科研',
+  algorithm: '算法题',
+  choice: '选择题',
+  fill_blank: '填空题',
+  proof: '证明题',
+  research: '科研项目',
 }
 
 const typeLabel = computed(() => {
@@ -289,7 +333,6 @@ async function onSubmit() {
 }
 
 function openWS(submissionId: number) {
-  // 关旧连接
   if (wsHandle.value) {
     wsHandle.value.close()
     wsHandle.value = null
@@ -335,44 +378,103 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.problem-detail {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 24px;
+.problem-page {
+  padding: var(--spacing-xl) 0;
 }
 
 .loading,
 .not-found {
   text-align: center;
   padding: 60px 0;
-  color: #666;
+  color: var(--color-text-muted);
 }
 
-.header {
-  margin-bottom: 24px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid #e5e7eb;
+/* ===== 两栏布局 ===== */
+.content-wrapper {
+  max-width: 1440px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 0 var(--spacing-lg);
+  display: flex;
+  gap: clamp(24px, 4vw, 40px);
+  align-items: flex-start;
+  flex-wrap: wrap;
 }
 
-.header h1 {
-  margin: 0 0 12px;
-  font-size: 24px;
+.left-col {
+  flex: 1 1 500px;
+  min-width: 0;
+}
+
+.right-col {
+  flex: 0 0 340px;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+@media (max-width: 900px) {
+  .content-wrapper {
+    gap: var(--spacing-lg);
+  }
+  .right-col {
+    flex: 1 1 100%;
+  }
+}
+
+/* ===== 卡片基础 ===== */
+.card {
+  background: var(--color-bg-card);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  transition: box-shadow 0.2s;
+}
+
+.card:hover {
+  box-shadow: var(--shadow-card-hover);
+}
+
+.card-header {
+  padding: var(--spacing-md);
+  border-bottom: 1px solid var(--color-border-light);
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+
+/* ===== 题目卡片 ===== */
+.problem-card {
+  padding: var(--spacing-xl);
+}
+
+.problem-header {
+  margin-bottom: var(--spacing-lg);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.title {
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-sm);
 }
 
 .meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
 }
 
-.badge {
-  display: inline-block;
-  padding: 2px 8px;
-  background: #f3f4f6;
-  color: #374151;
-  font-size: 12px;
-  border-radius: 3px;
+.tag {
+  padding: 2px 10px;
+  background: var(--color-tag-bg);
+  color: var(--color-tag-text);
+  font-size: var(--font-size-small);
+  border-radius: 12px;
+  font-weight: 500;
 }
 
 .tags {
@@ -381,56 +483,62 @@ onUnmounted(() => {
   gap: 6px;
 }
 
-.tag {
-  padding: 2px 8px;
+.tag-pill {
+  padding: 2px 10px;
   background: #eff6ff;
   color: #1e40af;
-  font-size: 12px;
-  border-radius: 3px;
+  font-size: var(--font-size-small);
+  border-radius: 12px;
 }
 
-.section {
-  margin-bottom: 32px;
-  padding: 16px;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+.desc-section {
+  margin-bottom: var(--spacing-lg);
 }
 
-.section h2 {
-  margin: 0 0 12px;
-  font-size: 18px;
+.desc-section h2 {
+  font-size: var(--font-size-subtitle);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-sm);
+}
+
+.desc-section h3 {
+  font-size: 15px;
+  margin: 0 0 var(--spacing-sm);
 }
 
 .section-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: var(--spacing-sm);
 }
 
 .section-header h2 {
   margin: 0;
 }
 
+/* 选项 */
 .options {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--spacing-sm);
 }
 
 .option {
-  padding: 8px 12px;
-  background: #f9fafb;
-  border-radius: 4px;
-  font-size: 14px;
+  padding: 10px 14px;
+  background: var(--color-sample-bg);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-body);
 }
 
-.option .key {
+.option-key {
   font-weight: 600;
   margin-right: 8px;
+  color: var(--color-primary);
 }
 
+/* 填空 */
 .blanks {
   display: flex;
   flex-direction: column;
@@ -439,69 +547,81 @@ onUnmounted(() => {
 
 .blank {
   display: flex;
-  gap: 12px;
-  font-size: 14px;
+  gap: var(--spacing-md);
+  font-size: var(--font-size-body);
 }
 
-.blank .rule {
-  color: #666;
-  font-size: 12px;
+.blank-rule {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
 }
 
-.test-case {
-  margin-bottom: 16px;
+/* 样例 */
+.sample-card {
+  background: var(--color-sample-bg);
+  border: 1px solid var(--color-sample-code-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
 }
 
-.tc-title {
+.sample-group {
+  display: flex;
+  gap: var(--spacing-lg);
+  flex-wrap: wrap;
+}
+
+.sample-group + .sample-group {
+  margin-top: var(--spacing-md);
+  padding-top: var(--spacing-md);
+  border-top: 1px dashed var(--color-border);
+}
+
+.sample-column {
+  flex: 1;
+  min-width: 180px;
+}
+
+.sample-label {
+  font-size: var(--font-size-small);
   font-weight: 600;
-  margin-bottom: 8px;
-  font-size: 14px;
+  color: var(--color-text-secondary);
+  margin-bottom: 6px;
+  letter-spacing: 0.3px;
 }
 
-.tc-block {
-  margin-bottom: 8px;
-}
-
-.tc-label {
-  font-size: 12px;
-  color: #666;
-  margin-bottom: 4px;
-}
-
-.tc-block pre {
-  margin: 0;
-  padding: 8px 12px;
-  background: #1f2937;
-  color: #f9fafb;
-  border-radius: 4px;
-  font-size: 12px;
-  overflow-x: auto;
-}
-
-.subproject {
-  margin-bottom: 20px;
-  padding-left: 12px;
-  border-left: 3px solid #4f46e5;
-}
-
-.subproject h3 {
-  margin: 0 0 8px;
-  font-size: 16px;
-}
-
-.subproject .hint {
-  margin-top: 8px;
-  padding: 6px 10px;
-  background: #fef3c7;
-  color: #92400e;
+.sample-content {
+  font-family: var(--font-family-mono);
   font-size: 13px;
-  border-radius: 4px;
+  background: var(--color-sample-code-bg);
+  border: 1px solid var(--color-sample-code-border);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.7;
 }
 
+/* 子项目 */
+.subproject {
+  margin-bottom: var(--spacing-md);
+  padding-left: var(--spacing-md);
+  border-left: 3px solid var(--color-primary);
+}
+
+.subproject-hint {
+  margin-top: var(--spacing-sm);
+  padding: 8px 12px;
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+  font-size: 13px;
+  border-radius: var(--radius-md);
+}
+
+/* 答案 */
 .answer-box {
-  padding: 12px;
-  background: #f9fafb;
-  border-radius: 4px;
+  padding: var(--spacing-md);
+  background: var(--color-sample-bg);
+  border-radius: var(--radius-md);
 }
 
 .answer-box h4 {
@@ -514,125 +634,164 @@ onUnmounted(() => {
 }
 
 .answer-box .empty {
-  color: #999;
+  color: var(--color-text-muted);
   text-align: center;
   padding: 20px;
 }
 
 /* ===== 提交面板 ===== */
-.submit-section {
-  margin-bottom: 32px;
+.submit-panel {
+  overflow: visible;
+}
+
+.submit-panel > .form-row,
+.submit-panel > .code-input,
+.submit-panel > .btn-primary,
+.submit-panel > .error,
+.submit-panel > .submission-result,
+.submit-panel > .login-tip {
+  margin-left: var(--spacing-md);
+  margin-right: var(--spacing-md);
 }
 
 .login-tip {
+  margin: var(--spacing-md);
   padding: 12px;
-  background: #fef3c7;
-  color: #92400e;
-  border-radius: 4px;
-  font-size: 14px;
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+  border-radius: var(--radius-md);
+  font-size: 13px;
 }
 
 .login-tip a {
-  color: #4f46e5;
+  color: var(--color-primary);
   font-weight: 600;
 }
 
 .form-row {
-  margin-bottom: 12px;
-  font-size: 14px;
+  margin-top: var(--spacing-md);
+  margin-bottom: var(--spacing-sm);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--font-size-body);
 }
 
-.form-row select {
-  padding: 6px 10px;
-  border: 1px solid #d0d5dd;
-  border-radius: 4px;
-  font-size: 14px;
+.form-row label {
+  color: var(--color-text-secondary);
 }
 
-.code-input {
-  width: 100%;
-  padding: 12px;
-  border: 1px solid #d0d5dd;
-  border-radius: 4px;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+.lang-select {
+  padding: 4px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
   font-size: 13px;
-  box-sizing: border-box;
-  resize: vertical;
+  background: var(--color-bg-card);
+  cursor: pointer;
   outline: none;
 }
 
+.code-input {
+  max-width: 100%;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-family: var(--font-family-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  resize: both;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
 .code-input:focus {
-  border-color: #4f46e5;
+  border-color: var(--color-primary);
 }
 
 .btn-primary {
-  margin-top: 12px;
+  margin-top: var(--spacing-sm);
   padding: 8px 24px;
-  background: #4f46e5;
-  color: white;
+  background: var(--color-primary);
+  color: var(--color-primary-text);
   border: none;
-  border-radius: 4px;
-  font-size: 14px;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-body);
+  font-weight: 500;
   cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
 }
 
 .btn-primary:disabled {
-  background: #a5b4fc;
+  background: var(--color-primary-disabled);
   cursor: not-allowed;
 }
 
-.btn-secondary {
-  padding: 6px 14px;
-  background: white;
-  color: #374151;
-  border: 1px solid #d0d5dd;
-  border-radius: 4px;
+.btn-ghost {
+  padding: 4px 12px;
+  background: transparent;
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-md);
   font-size: 13px;
-  text-decoration: none;
   cursor: pointer;
+  transition: background 0.2s;
 }
 
-.btn-secondary:hover {
-  border-color: #4f46e5;
-  color: #4f46e5;
+.btn-ghost:hover {
+  background: rgba(79, 70, 229, 0.06);
 }
 
 .error {
-  margin-top: 8px;
+  margin-top: var(--spacing-sm);
   padding: 8px 12px;
-  background: #fef2f2;
-  color: #b91c1c;
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
   font-size: 13px;
-  border-radius: 4px;
+  border-radius: var(--radius-md);
 }
 
 .submission-result {
-  margin-top: 16px;
+  margin-top: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
   padding: 12px;
-  background: #f9fafb;
-  border-radius: 4px;
+  background: var(--color-sample-bg);
+  border-radius: var(--radius-md);
 }
 
 .result-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 8px;
-  font-size: 14px;
+  font-size: var(--font-size-body);
+}
+
+.result-row:last-child {
+  margin-bottom: 0;
+}
+
+.result-label {
+  color: var(--color-text-secondary);
 }
 
 .status-badge {
-  display: inline-block;
   padding: 2px 10px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   font-weight: 500;
   font-size: 13px;
 }
 
-.status-PENDING { background: #e5e7eb; color: #374151; }
-.status-AC { background: #d1fae5; color: #065f46; }
-.status-WA { background: #fee2e2; color: #991b1b; }
-.status-TLE { background: #fef3c7; color: #92400e; }
-.status-MLE { background: #fef3c7; color: #92400e; }
-.status-RE { background: #fee2e2; color: #991b1b; }
-.status-CE { background: #fee2e2; color: #991b1b; }
+.status-PENDING { background: var(--color-neutral-bg); color: var(--color-neutral-text); }
+.status-AC { background: var(--color-success-bg); color: var(--color-success-text); }
+.status-WA { background: var(--color-danger-bg); color: var(--color-danger-text); }
+.status-TLE { background: var(--color-warning-bg); color: var(--color-warning-text); }
+.status-MLE { background: var(--color-warning-bg); color: var(--color-warning-text); }
+.status-RE { background: var(--color-danger-bg); color: var(--color-danger-text); }
+.status-CE { background: var(--color-danger-bg); color: var(--color-danger-text); }
 
 .error-message {
   margin-top: 8px;
@@ -640,16 +799,49 @@ onUnmounted(() => {
   background: #1f2937;
   color: #f9fafb;
   font-size: 12px;
-  border-radius: 4px;
+  font-family: var(--font-family-mono);
+  border-radius: var(--radius-md);
   overflow-x: auto;
   white-space: pre-wrap;
   max-height: 200px;
   overflow-y: auto;
 }
 
-.actions {
+/* ===== 题目信息卡片 ===== */
+.info-card {
+  padding: var(--spacing-md);
   display: flex;
-  gap: 12px;
-  margin-top: 24px;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--font-size-body);
+}
+
+.info-label {
+  color: var(--color-text-secondary);
+}
+
+.info-value {
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+/* ===== 返回链接 ===== */
+.back-link {
+  display: inline-block;
+  padding: 8px 16px;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-body);
+  border-radius: var(--radius-md);
+  transition: background 0.2s, color 0.2s;
+}
+
+.back-link:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--color-primary);
 }
 </style>
