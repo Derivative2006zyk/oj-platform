@@ -25,6 +25,51 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
+  :root {
+  /* 基础色板 - 明亮高级灰 */
+  --color-bg-page: #f5f6f8;
+  --color-bg-card: #ffffff;
+  --color-nav-bg: #ffffff;
+  --color-nav-text: #1d1d1f;
+  --color-text-primary: #1d1d1f;
+  --color-text-secondary: #6e6e73;
+  --color-link: #0066cc;
+  --color-border: #e0e0e0;
+  --color-primary: #0066cc;
+  --color-primary-hover: #004499;
+  --color-primary-text: #ffffff;
+  --color-success: #34c759;
+
+  /* 语义化扩展 */
+  --color-tag-bg: #f2f5f9;
+  --color-tag-text: #0066cc;
+  --color-sample-bg: #f9f9fb;
+  --color-sample-code-bg: #ffffff;
+  --color-sample-code-border: #e5e5ea;
+  --color-code-bg: #f2f2f6;
+  --color-editor-header-bg: #fafafa;
+  --color-editor-body-bg: #fefefe;
+
+  /* 阴影（更细腻） */
+  --shadow-nav: 0 1px 3px rgba(0,0,0,0.04);
+  --shadow-card: 0 1px 4px rgba(0,0,0,0.04), 0 0 0 1px rgba(0,0,0,0.02);
+  --shadow-card-hover: 0 4px 12px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.03);
+
+  /* 字体 */
+  --font-family-base: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-size-title: 20px;
+  --font-size-body: 14px;
+  --font-size-small: 12px;
+  --font-weight-bold: 600;
+  
+  /* 间距 */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-2xl: 40px;
+
   @media (max-width: 1024px) {
     font-size: 16px;
   }
