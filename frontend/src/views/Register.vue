@@ -141,7 +141,7 @@ async function onSubmit() {
 
 .form-item input:focus {
   outline: none;
-  border-color: #4f46e5;
+  border-color: var(--color-primary);
 }
 
 .error {
@@ -165,7 +165,7 @@ async function onSubmit() {
 button {
   width: 100%;
   padding: 10px 0;
-  background: #4f46e5;
+  background: var(--color-primary);
   color: white;
   border: none;
   border-radius: 4px;
@@ -174,7 +174,7 @@ button {
 }
 
 button:disabled {
-  background: #a5b4fc;
+  background: var(--color-primary-disabled);
   cursor: not-allowed;
 }
 
@@ -186,7 +186,7 @@ button:disabled {
 }
 
 .tip a {
-  color: #4f46e5;
+  color: var(--color-primary);
   text-decoration: none;
 }
 </style>
