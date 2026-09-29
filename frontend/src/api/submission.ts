@@ -31,10 +31,13 @@ export async function getSubmission(id: number): Promise<SubmissionDetail> {
   return res.data
 }
 
-export async function listMySubmissions(page: number = 1, pageSize: number = 20): Promise<any> {
-  const res = await api.get('/submissions', {
-    params: { page, page_size: pageSize },
-  })
+export async function listMySubmissions(params: {
+  page?: number
+  page_size?: number
+  status?: string
+  problem_id?: number
+} = {}): Promise<any> {
+  const res = await api.get('/submissions', { params })
   return res.data
 }
 
