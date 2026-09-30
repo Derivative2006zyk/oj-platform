@@ -9,7 +9,7 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true,
-        ws: true,  // 启用 WebSocket 代理
+        ws: true,
       },
     },
   },
@@ -20,6 +20,20 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true,
         ws: true,
+      },
+    },
+  },
+  optimizeDeps: {
+    include: ['monaco-editor'],
+  },
+    build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          if (id.includes('monaco-editor')) {
+            return 'monaco'
+          }
+        },
       },
     },
   },
