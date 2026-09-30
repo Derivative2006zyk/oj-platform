@@ -132,12 +132,13 @@
               </select>
             </div>
 
-            <textarea
-              v-model="submitPanel.code"
-              class="code-input"
-              placeholder="// 在此输入代码..."
-              rows="14"
-            ></textarea>
+            <div class="editor-wrapper">
+              <CodeEditor
+                v-model="submitPanel.code"
+                :language="submitPanel.language"
+                height="100%"
+              />
+            </div>
 
             <div v-if="submitError" class="error">{{ submitError }}</div>
 
@@ -207,6 +208,8 @@ import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 
 import MarkdownRenderer from '../components/MarkdownRenderer.vue'
+import { defineAsyncComponent } from 'vue'
+const CodeEditor = defineAsyncComponent(() => import('../components/CodeEditor.vue'))
 import { getProblemDetail, getProblemAnswer, type ProblemDetail } from '../api/problem'
 import { submitCode, type SubmissionDetail } from '../api/submission'
 import { openSubmissionWS, type SubmissionWSHandle, type WSMessage } from '../utils/ws'
@@ -843,5 +846,18 @@ onUnmounted(() => {
 .back-link:hover {
   background: rgba(0, 0, 0, 0.04);
   color: var(--color-primary);
+}
+.editor-wrapper {
+  margin: 0 var(--spacing-md) var(--spacing-sm);
+  border-radius: var(--radius-md);
+
+  /* ===== 双向拖动缩放 ===== */
+  resize: both;
+  overflow: auto;
+  min-width: 240px;
+  max-width: 100%;
+  min-height: 200px;
+  max-height: 800px;
+  height: 360px;
 }
 </style>
