@@ -98,3 +98,6 @@ class WorkerSettings:
     redis_settings = RedisSettings.from_dsn(settings.REDIS_URL)
     on_startup = startup
     on_shutdown = shutdown
+    max_jobs = 2           # 同时最多跑 2 个判题任务
+    job_timeout = 60       # 单任务最长 60 秒
+    keep_result = 3600     # 结果保留 1 小时
