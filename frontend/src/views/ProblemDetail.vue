@@ -850,8 +850,6 @@ onUnmounted(() => {
 .editor-wrapper {
   margin: 0 var(--spacing-md) var(--spacing-sm);
   border-radius: var(--radius-md);
-
-  /* ===== 双向拖动缩放 ===== */
   resize: both;
   overflow: auto;
   min-width: 240px;
