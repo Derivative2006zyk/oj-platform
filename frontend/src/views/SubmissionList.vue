@@ -60,7 +60,7 @@
                 {{ item.passed_cases }} / {{ item.total_cases }}
               </td>
               <td class="col-runtime">
-                {{ item.runtime_ms !== null ? item.runtime_ms + ' ms' : '-' }}
+                {{ item.runtime_ms != null ? item.runtime_ms + ' ms' : '-' }}
               </td>
               <td class="col-time">{{ formatTime(item.created_at) }}</td>
             </tr>
