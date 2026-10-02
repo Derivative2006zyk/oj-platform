@@ -108,6 +108,54 @@
             </div>
           </section>
         </article>
+        <!-- 我的提交历史 -->
+        <section
+          v-if="userStore.isLoggedIn"
+          class="card history-card"
+        >
+          <div class="card-header history-header">
+            <span>我的提交历史</span>
+            <router-link to="/submissions" class="view-all-link">
+              查看全部
+            </router-link>
+          </div>
+
+          <div v-if="submissionsLoading" class="history-empty">加载中...</div>
+          <div v-else-if="mySubmissions.length === 0" class="history-empty">
+            暂无提交记录
+          </div>
+
+          <div v-else class="history-list">
+            <div
+              v-for="item in mySubmissions"
+              :key="item.id"
+              class="history-row"
+            >
+              <!-- 左侧：状态徽章 + 耗时 -->
+              <div class="history-left">
+                <span :class="['status-badge', `status-${item.status}`]">
+                  {{ statusLabel(item.status) }}
+                </span>
+                <span class="history-runtime">
+                  {{ item.runtime_ms != null ? item.runtime_ms + ' ms' : '—' }}
+                </span>
+              </div>
+
+              <!-- 中间：测试点 + 语言 -->
+              <div class="history-mid">
+                <span class="history-cases">
+                  {{ item.passed_cases }} / {{ item.total_cases }}
+                </span>
+                <span class="history-lang">{{ item.language }}</span>
+              </div>
+
+              <!-- 右侧：时间 -->
+              <div class="history-right">
+                {{ formatTime(item.created_at) }}
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
 
       <!-- ========== 右栏：提交面板 ========== -->
@@ -211,7 +259,11 @@ import MarkdownRenderer from '../components/MarkdownRenderer.vue'
 import { defineAsyncComponent } from 'vue'
 const CodeEditor = defineAsyncComponent(() => import('../components/CodeEditor.vue'))
 import { getProblemDetail, getProblemAnswer, type ProblemDetail } from '../api/problem'
-import { submitCode, type SubmissionDetail } from '../api/submission'
+import {
+  submitCode,
+  listProblemSubmissions,
+  type SubmissionDetail,
+} from '../api/submission'
 import { openSubmissionWS, type SubmissionWSHandle, type WSMessage } from '../utils/ws'
 import { useUserStore } from '../stores/user'
 
@@ -236,6 +288,20 @@ const submitting = ref(false)
 const submitError = ref('')
 const currentSubmission = ref<SubmissionDetail | null>(null)
 const wsHandle = ref<SubmissionWSHandle | null>(null)
+
+  // ===== 提交历史 =====
+interface HistoryItem {
+  id: number
+  language: string
+  status: string
+  passed_cases: number
+  total_cases: number
+  runtime_ms: number | null
+  created_at: string
+}
+
+const mySubmissions = ref<HistoryItem[]>([])
+const submissionsLoading = ref(false)
 
 const categoryNames: Record<number, string> = {
   1: '算法',
@@ -299,6 +365,35 @@ async function showAnswer() {
   }
 }
 
+async function loadMySubmissions() {
+  if (!userStore.isLoggedIn) {
+    mySubmissions.value = []
+    return
+  }
+
+  submissionsLoading.value = true
+  try {
+    const data = await listProblemSubmissions(problemId.value, 1, 3)
+    mySubmissions.value = data.items || []
+  } catch (e) {
+    console.error('加载提交历史失败', e)
+    mySubmissions.value = []
+  } finally {
+    submissionsLoading.value = false
+  }
+}
+
+function formatTime(s: string): string {
+  try {
+    const d = new Date(s)
+    if (isNaN(d.getTime())) return s
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+  } catch {
+    return s
+  }
+}
+
 async function onSubmit() {
   submitError.value = ''
 
@@ -323,6 +418,9 @@ async function onSubmit() {
 
     currentSubmission.value = sub
     openWS(sub.id)
+
+    // 刷新历史列表（新记录 PENDING）
+    loadMySubmissions()
   } catch (e: any) {
     const status = e?.response?.status
     if (status === 401) {
@@ -360,6 +458,8 @@ function openWS(submissionId: number) {
           wsHandle.value.close()
           wsHandle.value = null
         }
+        // 判题完成，刷新历史列表
+        loadMySubmissions()
       }
     },
     (e) => {
@@ -370,6 +470,7 @@ function openWS(submissionId: number) {
 
 onMounted(() => {
   loadProblem()
+  loadMySubmissions()
 })
 
 onUnmounted(() => {
@@ -640,6 +741,127 @@ onUnmounted(() => {
   color: var(--color-text-muted);
   text-align: center;
   padding: 20px;
+}
+/* ===== 提交历史卡片 ===== */
+.history-card {
+  margin-top: var(--spacing-lg);
+  overflow: hidden;
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--font-size-body);
+}
+
+.view-all-link {
+  color: var(--color-primary);
+  font-size: var(--font-size-small);
+  font-weight: 500;
+}
+
+.view-all-link:hover {
+  text-decoration: underline;
+}
+
+.history-empty {
+  text-align: center;
+  padding: 32px 20px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-body);
+}
+
+.history-list {
+  padding: var(--spacing-sm) var(--spacing-md) var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.history-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: var(--color-sample-bg);
+  transition: background 0.15s;
+}
+
+.history-row:hover {
+  background: var(--color-primary-light);
+}
+
+/* 左侧：状态 + 耗时 */
+.history-left {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 70px;
+  flex-shrink: 0;
+}
+
+.history-runtime {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  font-family: var(--font-family-mono);
+}
+
+/* 中间：测试点 + 语言 */
+.history-mid {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-width: 0;
+}
+
+.history-cases {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  font-family: var(--font-family-mono);
+}
+
+.history-lang {
+  display: inline-block;
+  padding: 1px 8px;
+  background: white;
+  border: 1px solid var(--color-border-light);
+  border-radius: 10px;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  font-family: var(--font-family-mono);
+}
+
+/* 右侧：时间 */
+.history-right {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+/* 响应式 */
+@media (max-width: 600px) {
+  .history-row {
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+  }
+
+  .history-left {
+    flex-direction: row;
+    gap: 8px;
+    min-width: auto;
+    width: 100%;
+  }
+
+  .history-right {
+    width: 100%;
+    text-align: left;
+  }
 }
 
 /* ===== 提交面板 ===== */
