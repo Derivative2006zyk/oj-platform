@@ -19,6 +19,7 @@ class SubmissionSummary(BaseModel):
     status: str
     passed_cases: int
     total_cases: int
+    runtime_ms: Optional[int] = None
     created_at: datetime
 
 
