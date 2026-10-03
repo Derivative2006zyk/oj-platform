@@ -19,7 +19,8 @@ class UserPlugin(Plugin):
 
     def get_routers(self):
         from app.plugins.user_plugin.api import router as user_router
-        return [user_router]
+        from app.plugins.user_plugin.api import admin_router
+        return [user_router, admin_router]
 
     async def _on_user_registered(self, payload: dict) -> None:
         print(f"[user_plugin] user registered: {payload}")
