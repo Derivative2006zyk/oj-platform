@@ -41,3 +41,31 @@ class UserStats(BaseModel):
     solved_problems: int
     acceptance_rate: float
     language_distribution: dict
+
+class AdminUserItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    username: str
+    email: str
+    role: str
+    is_active: bool
+    created_at: datetime
+
+
+class UserRoleUpdate(BaseModel):
+    role: str = Field(pattern="^(admin|user)$")
+
+
+class UserStatusUpdate(BaseModel):
+    is_active: bool
+
+
+class AdminStats(BaseModel):
+    total_users: int
+    total_admins: int
+    active_users: int
+    banned_users: int
+    total_submissions: int
+    total_accepted: int
+    total_problems: int
