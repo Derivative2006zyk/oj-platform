@@ -7,13 +7,10 @@
         <router-link to="/" class="nav-link">题库</router-link>
         <template v-if="userStore.isLoggedIn">
           <router-link to="/submissions" class="nav-link">我的提交</router-link>
-          <router-link
-            v-if="userStore.isAdmin"
-            to="/admin/problem/new"
-            class="nav-link"
-          >
-            新建题目
-          </router-link>
+          <template v-if="userStore.isAdmin">
+            <router-link to="/admin/users" class="nav-link">用户管理</router-link>
+            <router-link to="/admin/stats" class="nav-link">统计</router-link>
+          </template>
         </template>
       </nav>
 
