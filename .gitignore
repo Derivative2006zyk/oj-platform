@@ -14,3 +14,8 @@ uploads_backup/
 data/ 
 backup_*.sql 
 uploads_backup/ 
+# Tauri / Rust
+desktop/node_modules/
+desktop/dist/
+desktop/src-tauri/target/
+desktop/src-tauri/gen/
