@@ -17,6 +17,7 @@ from app.schemas.submission import (
     SubmissionDetail,
     SubmissionListResponse,
 )
+from app.schemas.widget import WidgetSummary
 
 
 router = APIRouter(prefix="/api", tags=["submissions"])
@@ -149,3 +150,11 @@ async def submission_ws(
         pass
     finally:
         manager.disconnect(user_id, websocket)
+
+@router.get("/widget/summary", response_model=WidgetSummary)
+async def get_widget_summary(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """桌面小组件摘要数据。"""
+    return await service.get_widget_summary(db, current_user.id)
