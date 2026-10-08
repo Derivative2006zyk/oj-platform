@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 
 import * as authApi from '../api/auth'
 import type { UserInfo, RegisterPayload, LoginPayload } from '../api/auth'
+import { refreshTrayFromBackend, updateTrayTooltip } from '../utils/tauri'
 
 const TOKEN_KEY = 'oj_token'
 const USER_KEY = 'oj_user'
@@ -59,11 +60,15 @@ export const useUserStore = defineStore('user', () => {
     // 拉用户信息
     const u = await fetchMe()
 
+    // 刷新托盘 tooltip
+    refreshTrayFromBackend(res.access_token).catch(() => {})
+
     return u
   }
 
   function logout() {
     clearSession()
+    updateTrayTooltip('OJ Platform').catch(() => {})
   }
 
   return {
