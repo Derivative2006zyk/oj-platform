@@ -43,17 +43,14 @@ fn start_backend_stack() -> Result<(), String> {
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!(
-            "docker compose up -d failed:\n{}",
-            stderr
-        ));
+        return Err(format!("docker compose up -d failed:\n{}", stderr));
     }
 
     println!("[launcher] docker compose up -d done");
     Ok(())
 }
 
-/// 轮询等待后端就绪。返回是否成功。
+/// 轮询等待后端就绪。
 fn wait_for_backend() -> bool {
     let start = Instant::now();
     let timeout = Duration::from_secs(MAX_WAIT_SECONDS);
@@ -69,11 +66,7 @@ fn wait_for_backend() -> bool {
     false
 }
 
-/// 主流程：
-/// 1. 检查后端
-/// 2. 若未启动，执行 docker compose up -d
-/// 3. 等待后端就绪
-/// 返回 Ok(()) 表示后端可用。
+/// 主流程：检查 → 拉起 → 等待。
 pub fn ensure_backend_ready() -> Result<(), String> {
     if is_backend_running() {
         println!("[launcher] backend already running");
