@@ -266,6 +266,7 @@ import {
 } from '../api/submission'
 import { openSubmissionWS, type SubmissionWSHandle, type WSMessage } from '../utils/ws'
 import { useUserStore } from '../stores/user'
+import { refreshTrayFromBackend } from '../utils/tauri'
 
 const route = useRoute()
 const userStore = useUserStore()
@@ -460,6 +461,14 @@ function openWS(submissionId: number) {
         }
         // 判题完成，刷新历史列表
         loadMySubmissions()
+
+        // 刷新托盘 tooltip
+        const token = localStorage.getItem('oj_token')
+        if (token) {
+          import('../utils/tauri').then(({ refreshTrayFromBackend }) => {
+            refreshTrayFromBackend(token).catch(() => {})
+          })
+        }
       }
     },
     (e) => {
