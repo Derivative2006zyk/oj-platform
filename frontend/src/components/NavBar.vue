@@ -112,7 +112,7 @@ function onLogout() {
 
 .register-btn {
   background: var(--color-primary);
-  color: white;
+  color: var(--color-primary-text);
 }
 
 .register-btn:hover {
@@ -145,7 +145,7 @@ function onLogout() {
   height: 30px;
   border-radius: 50%;
   background: var(--color-primary);
-  color: white;
+  color: var(--color-primary-text);
   display: flex;
   align-items: center;
   justify-content: center;

@@ -1,7 +1,10 @@
 <template>
   <div class="auth-page">
-    <div class="auth-box">
-      <h1>登录</h1>
+    <div class="card auth-box">
+      <header class="auth-header">
+        <h1>登录</h1>
+        <p class="auth-subtitle">欢迎回到 OJ Platform</p>
+      </header>
 
       <form @submit.prevent="onSubmit">
         <div class="form-item">
@@ -16,7 +19,7 @@
 
         <div v-if="error" class="error">{{ error }}</div>
 
-        <button type="submit" :disabled="loading">
+        <button type="submit" class="btn-primary" :disabled="loading">
           {{ loading ? '登录中...' : '登录' }}
         </button>
       </form>
@@ -56,7 +59,6 @@ async function onSubmit() {
       password: form.password,
     })
 
-    // 登录成功，跳回原页面或首页
     const redirect = (route.query.redirect as string) || '/'
     router.push(redirect)
   } catch (e: any) {
@@ -77,83 +79,117 @@ async function onSubmit() {
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: calc(100vh - 60px);
-  background: #f5f7fa;
+  min-height: calc(100vh - 56px);
+  padding: var(--spacing-lg);
+  background: var(--color-bg-page);
+}
+
+.card {
+  background: var(--color-bg-card);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
 }
 
 .auth-box {
-  width: 360px;
-  padding: 32px;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  width: 100%;
+  max-width: 380px;
+  padding: var(--spacing-xl);
 }
 
-.auth-box h1 {
-  margin: 0 0 24px;
-  font-size: 22px;
+.auth-header {
+  margin-bottom: var(--spacing-lg);
   text-align: center;
 }
 
+.auth-header h1 {
+  margin: 0 0 var(--spacing-xs);
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+
+.auth-subtitle {
+  margin: 0;
+  font-size: var(--font-size-small);
+  color: var(--color-text-secondary);
+}
+
 .form-item {
-  margin-bottom: 16px;
+  margin-bottom: var(--spacing-md);
 }
 
 .form-item label {
   display: block;
   margin-bottom: 6px;
-  font-size: 14px;
-  color: #444;
+  font-size: var(--font-size-small);
+  color: var(--color-text-secondary);
 }
 
 .form-item input {
   width: 100%;
-  padding: 8px 12px;
-  border: 1px solid #d0d5dd;
-  border-radius: 4px;
-  font-size: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-body);
+  font-family: inherit;
+  background: var(--color-bg-card);
+  color: var(--color-text-primary);
   box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.2s;
 }
 
 .form-item input:focus {
-  outline: none;
   border-color: var(--color-primary);
 }
 
 .error {
-  margin-bottom: 12px;
-  padding: 8px 12px;
-  background: #fef2f2;
-  color: #b91c1c;
+  margin-bottom: var(--spacing-md);
+  padding: 10px 12px;
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
   font-size: 13px;
-  border-radius: 4px;
+  border-radius: var(--radius-md);
 }
 
-button {
+.btn-primary {
   width: 100%;
   padding: 10px 0;
+  margin-top: var(--spacing-xs);
   background: var(--color-primary);
-  color: white;
+  color: var(--color-primary-text);
   border: none;
-  border-radius: 4px;
-  font-size: 14px;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-body);
+  font-weight: 500;
+  font-family: inherit;
   cursor: pointer;
+  transition: background 0.2s;
 }
 
-button:disabled {
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.btn-primary:disabled {
   background: var(--color-primary-disabled);
   cursor: not-allowed;
 }
 
 .tip {
-  margin-top: 16px;
-  font-size: 13px;
+  margin: var(--spacing-lg) 0 0;
+  font-size: var(--font-size-small);
   text-align: center;
-  color: #666;
+  color: var(--color-text-secondary);
 }
 
 .tip a {
   color: var(--color-primary);
   text-decoration: none;
+  font-weight: 500;
+}
+
+.tip a:hover {
+  text-decoration: underline;
 }
 </style>

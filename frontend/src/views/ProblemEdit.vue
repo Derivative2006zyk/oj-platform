@@ -1,9 +1,13 @@
 <template>
   <div class="problem-edit">
+    <header class="page-header">
+      <h1>{{ isEdit ? '编辑题目' : '录入题目' }}</h1>
+      <p class="page-desc">支持 Markdown 与 LaTeX 语法</p>
+    </header>
+
     <p class="login-notice">
       提示：当前页面走管理员密钥验证。0.2 后续版本将支持 JWT 管理员。
     </p>
-    <h1>{{ isEdit ? '编辑题目' : '录入题目' }}</h1>
 
     <div class="form-group">
       <label>管理员密钥</label>
@@ -156,10 +160,10 @@
     </div>
 
     <div class="actions">
-      <button @click="submit" :disabled="submitting" class="submit-btn">
+      <button @click="submit" :disabled="submitting" class="btn-primary">
         {{ submitting ? '保存中...' : '保存' }}
       </button>
-      <button @click="cancel" class="cancel-btn">取消</button>
+      <button @click="cancel" class="btn-ghost">取消</button>
     </div>
   </div>
 </template>
@@ -486,216 +490,283 @@ onMounted(async () => {
 .problem-edit {
   max-width: 800px;
   margin: 0 auto;
-  padding: 20px;
+  padding: var(--spacing-xl) var(--spacing-lg);
 }
+
+/* ===== 页头 ===== */
+.page-header {
+  margin-bottom: var(--spacing-lg);
+}
+
+.page-header h1 {
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-xs);
+}
+
+.page-desc {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+}
+
 .login-notice {
-  padding: 8px 12px;
-  background: #eff6ff;
-  color: #1e40af;
+  padding: 10px 14px;
+  background: var(--color-primary-light);
+  color: var(--color-primary);
   font-size: 13px;
-  border-radius: 4px;
-  margin-bottom: 16px;
-}
-h1 {
-  margin-bottom: 20px;
+  border-radius: var(--radius-md);
+  margin-bottom: var(--spacing-lg);
 }
 
 h3 {
-  margin: 15px 0 10px;
-  color: #374151;
+  margin: var(--spacing-md) 0 var(--spacing-sm);
+  font-size: 15px;
+  color: var(--color-text-primary);
 }
 
 h4 {
-  margin: 10px 0;
-  color: #374151;
+  margin: 0 0 var(--spacing-sm);
+  font-size: var(--font-size-body);
+  color: var(--color-text-primary);
 }
 
+/* ===== 表单 ===== */
 .form-group {
-  margin-bottom: 15px;
+  margin-bottom: var(--spacing-md);
 }
 
 .form-group label {
   display: block;
-  margin-bottom: 5px;
-  font-weight: bold;
-  color: #374151;
+  margin-bottom: 6px;
+  font-size: var(--font-size-small);
+  font-weight: 500;
+  color: var(--color-text-secondary);
 }
 
 .form-group input,
 .form-group textarea,
 .form-group select {
   width: 100%;
-  padding: 8px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-body);
   font-family: inherit;
+  background: var(--color-bg-card);
+  color: var(--color-text-primary);
   box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.2s;
 }
 
 .form-group textarea {
   resize: vertical;
-  font-family: 'Consolas', 'Monaco', monospace;
+  font-family: var(--font-family-mono);
+  line-height: 1.6;
 }
 
 .form-group input:focus,
 .form-group textarea:focus,
 .form-group select:focus {
-  outline: none;
-  border-color: #2563eb;
+  border-color: var(--color-primary);
 }
 
 .hint {
   display: block;
   margin-top: 4px;
-  color: #6b7280;
+  color: var(--color-text-muted);
   font-size: 12px;
 }
 
 .uploading {
-  margin-top: 5px;
-  color: #2563eb;
+  margin-top: 6px;
+  color: var(--color-primary);
   font-size: 13px;
 }
 
+/* ===== 动态块 ===== */
 .dynamic-block {
-  margin: 20px 0;
-  padding: 15px;
-  background: #f9fafb;
-  border-radius: 8px;
+  margin: var(--spacing-lg) 0;
+  padding: var(--spacing-md);
+  background: var(--color-sample-bg);
+  border-radius: var(--radius-md);
 }
 
 .dynamic-item {
   display: flex;
-  gap: 8px;
+  gap: var(--spacing-sm);
   align-items: flex-start;
-  margin-bottom: 10px;
+  margin-bottom: var(--spacing-sm);
   flex-wrap: wrap;
 }
 
 .dynamic-item textarea,
-.dynamic-item input {
+.dynamic-item input[type="text"] {
   flex: 1;
   min-width: 150px;
-  padding: 6px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-family: 'Consolas', 'Monaco', monospace;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-family-mono);
   font-size: 13px;
+  background: var(--color-bg-card);
+  color: var(--color-text-primary);
   box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.dynamic-item textarea:focus,
+.dynamic-item input[type="text"]:focus {
+  border-color: var(--color-primary);
 }
 
 .item-index {
   min-width: 40px;
-  padding-top: 8px;
-  color: #6b7280;
-  font-weight: bold;
+  padding-top: 10px;
+  color: var(--color-text-muted);
+  font-weight: 500;
+  font-family: var(--font-family-mono);
+  font-size: 13px;
 }
 
 .checkbox-label {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding-top: 8px;
+  padding-top: 10px;
   white-space: nowrap;
   font-size: 13px;
+  color: var(--color-text-secondary);
   cursor: pointer;
 }
 
+/* ===== 子项目 ===== */
 .subproject-edit {
-  background: white;
-  padding: 12px;
-  border-radius: 6px;
-  margin-bottom: 12px;
-  border: 1px solid #e5e7eb;
+  background: var(--color-bg-card);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--spacing-md);
+  border: 1px solid var(--color-border-light);
 }
 
 .subproject-edit > input,
 .subproject-edit > textarea {
   width: 100%;
-  margin-bottom: 8px;
-  padding: 6px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  margin-bottom: var(--spacing-sm);
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: var(--font-size-body);
+  background: var(--color-bg-card);
+  color: var(--color-text-primary);
   box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.subproject-edit > textarea {
+  font-family: var(--font-family-mono);
+  line-height: 1.6;
+}
+
+.subproject-edit > input:focus,
+.subproject-edit > textarea:focus {
+  border-color: var(--color-primary);
 }
 
 .ref-edit {
   display: flex;
-  gap: 5px;
-  margin-bottom: 5px;
+  gap: 6px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
 }
 
 .ref-edit input {
   flex: 1;
-  padding: 5px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  min-width: 120px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
   font-size: 13px;
+  background: var(--color-bg-card);
+  color: var(--color-text-primary);
+  outline: none;
+  transition: border-color 0.2s;
 }
 
+.ref-edit input:focus {
+  border-color: var(--color-primary);
+}
+
+/* ===== 按钮 ===== */
+.btn-primary,
+.btn-ghost,
 .btn-success,
 .btn-danger {
-  padding: 6px 12px;
-  border: none;
-  border-radius: 4px;
+  padding: 10px 20px;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-body);
+  font-weight: 500;
+  font-family: inherit;
   cursor: pointer;
-  font-size: 13px;
-  color: white;
-}
-
-.btn-success {
-  background: #16a34a;
-}
-
-.btn-success:hover {
-  background: #15803d;
-}
-
-.btn-danger {
-  background: #dc2626;
-}
-
-.btn-danger:hover {
-  background: #b91c1c;
-}
-
-.actions {
-  margin-top: 20px;
-  display: flex;
-  gap: 10px;
-}
-
-.submit-btn {
-  padding: 12px 24px;
-  background: #2563eb;
-  color: white;
   border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 16px;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
 }
 
-.submit-btn:hover:not(:disabled) {
-  background: #1d4ed8;
+.btn-primary {
+  background: var(--color-primary);
+  color: var(--color-primary-text);
 }
 
-.submit-btn:disabled {
-  opacity: 0.6;
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.btn-primary:disabled {
+  background: var(--color-primary-disabled);
   cursor: not-allowed;
 }
 
-.cancel-btn {
-  padding: 12px 24px;
-  background: #6b7280;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 16px;
+.btn-ghost {
+  background: transparent;
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
 }
 
-.cancel-btn:hover {
-  background: #4b5563;
+.btn-ghost:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.btn-success {
+  padding: 6px 14px;
+  font-size: 13px;
+  background: var(--color-success-text);
+  color: var(--color-primary-text);
+}
+
+.btn-success:hover {
+  opacity: 0.9;
+}
+
+.btn-danger {
+  padding: 6px 14px;
+  font-size: 13px;
+  background: var(--color-danger-text);
+  color: var(--color-primary-text);
+}
+
+.btn-danger:hover {
+  opacity: 0.9;
+}
+
+.actions {
+  margin-top: var(--spacing-xl);
+  display: flex;
+  gap: var(--spacing-sm);
 }
 </style>

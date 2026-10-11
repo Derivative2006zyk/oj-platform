@@ -3,7 +3,10 @@
     <div class="container">
       <!-- 页面标题栏 -->
       <header class="page-header">
-        <h1>我的提交</h1>
+        <div class="page-header-main">
+          <h1>我的提交</h1>
+          <p class="page-desc">共 {{ total }} 条提交记录</p>
+        </div>
         <div class="filter-area">
           <label>状态</label>
           <select v-model="filterStatus" class="status-select" @change="onFilterChange">
@@ -147,8 +150,8 @@ async function load() {
     if (filterStatus.value) params.status = filterStatus.value
 
     const data = await listMySubmissions(params)
-    items.value = data.items
-    total.value = data.total
+    items.value = Array.isArray(data?.items) ? data.items : []
+    total.value = typeof data?.total === 'number' ? data.total : 0
   } catch (e) {
     console.error('加载失败', e)
     items.value = []
@@ -186,7 +189,7 @@ onMounted(load)
 }
 
 .container {
-  max-width: 1200px;
+  max-width: 960px;
   margin: 0 auto;
   padding: 0 var(--spacing-lg);
 }
@@ -195,24 +198,30 @@ onMounted(load)
 .page-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-end;
   margin-bottom: var(--spacing-lg);
   flex-wrap: wrap;
   gap: var(--spacing-md);
 }
 
-.page-header h1 {
-  font-size: 22px;
+.page-header-main h1 {
+  font-size: var(--font-size-title);
   font-weight: var(--font-weight-bold);
   color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-xs);
+}
+
+.page-desc {
   margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
 }
 
 .filter-area {
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
-  font-size: var(--font-size-body);
+  font-size: var(--font-size-small);
 }
 
 .filter-area label {
@@ -220,11 +229,13 @@ onMounted(load)
 }
 
 .status-select {
-  padding: 6px 12px;
+  padding: 8px 12px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   font-size: var(--font-size-body);
+  font-family: inherit;
   background: var(--color-bg-card);
+  color: var(--color-text-primary);
   cursor: pointer;
   outline: none;
   transition: border-color 0.2s;
@@ -273,16 +284,14 @@ onMounted(load)
 }
 
 .submission-table tbody tr:hover {
-  background: rgba(0, 0, 0, 0.015);
+  background: var(--color-primary-light);
 }
 
 .submission-table th {
-  background: var(--color-editor-header-bg);
+  background: var(--color-bg-page);
   font-weight: var(--font-weight-bold);
   color: var(--color-text-secondary);
   font-size: var(--font-size-small);
-  letter-spacing: 0.3px;
-  text-transform: uppercase;
 }
 
 .col-id { width: 80px; }
@@ -345,28 +354,30 @@ onMounted(load)
   gap: var(--spacing-md);
   padding: var(--spacing-md);
   border-top: 1px solid var(--color-border-light);
-  font-size: var(--font-size-body);
+  font-size: var(--font-size-small);
 }
 
 .page-btn {
   padding: 6px 16px;
   background: var(--color-bg-card);
-  color: var(--color-text-primary);
-  border: 1px solid var(--color-border);
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
   border-radius: var(--radius-md);
   font-size: 13px;
+  font-family: inherit;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background 0.2s;
 }
 
 .page-btn:hover:not(:disabled) {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
+  background: var(--color-primary-light);
 }
 
 .page-btn:disabled {
   color: var(--color-text-muted);
+  border-color: var(--color-border);
   cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .page-info {

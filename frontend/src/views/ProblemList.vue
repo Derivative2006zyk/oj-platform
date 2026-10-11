@@ -1,6 +1,9 @@
 <template>
   <div class="problem-list">
-    <h1>题库</h1>
+    <header class="page-header">
+      <h1>题库</h1>
+      <p class="page-desc">共 {{ total }} 道题目</p>
+    </header>
 
     <!-- 主分类导航 -->
     <div class="category-nav">
@@ -15,71 +18,72 @@
     </div>
 
     <!-- 筛选区域 -->
-    <div class="filters">
-      <input
-        v-model="keyword"
-        placeholder="搜索题目..."
-        @keyup.enter="search"
-      />
-      <select v-model="difficulty" @change="search">
-        <option :value="null">全部难度</option>
-        <option v-for="d in 5" :key="d" :value="d">{{ d }}星</option>
-      </select>
-      <select v-model="selectedTag" @change="search">
-        <option value="">全部标签</option>
-        <option v-for="tag in allTags" :key="tag" :value="tag">{{ tag }}</option>
-      </select>
-      <select v-model="selectedType" @change="search">
-        <option value="">全部题型</option>
-        <option value="algorithm">算法题</option>
-        <option value="choice">选择题</option>
-        <option value="fill_blank">填空题</option>
-        <option value="proof">证明题</option>
-        <option value="research">科研项目</option>
-      </select>
-      <button @click="search">搜索</button>
-      <button @click="goCreate" class="create-btn">录入题目</button>
+    <div class="card filters-card">
+      <div class="filters">
+        <input
+          v-model="keyword"
+          class="search-input"
+          placeholder="搜索题目..."
+          @keyup.enter="search"
+        />
+        <select v-model="difficulty" class="filter-select" @change="search">
+          <option :value="null">全部难度</option>
+          <option v-for="d in 5" :key="d" :value="d">{{ '★'.repeat(d) }}</option>
+        </select>
+        <select v-model="selectedTag" class="filter-select" @change="search">
+          <option value="">全部标签</option>
+          <option v-for="tag in allTags" :key="tag" :value="tag">{{ tag }}</option>
+        </select>
+        <select v-model="selectedType" class="filter-select" @change="search">
+          <option value="">全部题型</option>
+          <option value="algorithm">算法题</option>
+          <option value="choice">选择题</option>
+          <option value="fill_blank">填空题</option>
+          <option value="proof">证明题</option>
+          <option value="research">科研项目</option>
+        </select>
+        <button class="btn-primary" @click="search">搜索</button>
+        <button class="btn-ghost" @click="goCreate">录入题目</button>
+      </div>
     </div>
 
-    <!-- 题目表格 -->
-    <table>
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>标题</th>
-          <th>题型</th>
-          <th>难度</th>
-          <th>标签</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr
-          v-for="problem in problems"
-          :key="problem.id"
-          @click="goDetail(problem.id)"
-        >
-          <td>{{ problem.id }}</td>
-          <td>{{ problem.title }}</td>
-          <td>{{ typeLabel(problem.type) }}</td>
-          <td>{{ '★'.repeat(problem.difficulty) }}</td>
-          <td>
-            <span v-for="tag in problem.tags" :key="tag" class="tag">{{ tag }}</span>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+    <!-- 题目列表 -->
+    <div v-if="problems.length === 0" class="card empty-card">
+      <div class="empty">暂无题目</div>
+    </div>
 
-    <p v-if="problems.length === 0" class="empty">暂无题目</p>
+    <div v-else class="problem-list-body">
+      <div
+        v-for="problem in problems"
+        :key="problem.id"
+        class="card problem-row"
+        @click="goDetail(problem.id)"
+      >
+        <div class="problem-id">#{{ problem.id }}</div>
+        <div class="problem-main">
+          <div class="problem-title">{{ problem.title }}</div>
+          <div v-if="problem.tags && problem.tags.length" class="problem-tags">
+            <span v-for="tag in problem.tags" :key="tag" class="tag-pill">{{ tag }}</span>
+          </div>
+        </div>
+        <div class="problem-meta">
+          <span class="type-badge">{{ typeLabel(problem.type) }}</span>
+          <span class="difficulty">{{ '★'.repeat(problem.difficulty) }}</span>
+        </div>
+      </div>
+    </div>
 
     <!-- 分页 -->
     <div class="pagination" v-if="total > 0">
-      <button :disabled="page <= 1" @click="changePage(page - 1)">上一页</button>
-      <span>
-        共 {{ total }} 条 · 显示第
-        {{ (page - 1) * pageSize + 1 }} -
-        {{ Math.min(page * pageSize, total) }} 条 · 第 {{ page }} / {{ totalPages }} 页
+      <button class="btn-ghost" :disabled="page <= 1" @click="changePage(page - 1)">
+        上一页
+      </button>
+      <span class="page-info">
+        第 {{ page }} / {{ totalPages }} 页 · 共 {{ total }} 条
       </span>
-      <button :disabled="page >= totalPages" @click="changePage(page + 1)">下一页</button>
+      <button class="btn-ghost" :disabled="page >= totalPages" @click="changePage(page + 1)">
+        下一页
+      </button>
     </div>
   </div>
 </template>
@@ -150,17 +154,23 @@ function syncUrl() {
 
 // ===== 加载题目列表 =====
 async function loadProblems() {
-  const data = await getProblems({
-    page: page.value,
-    page_size: pageSize,
-    category_id: selectedCategory.value || undefined,
-    difficulty: difficulty.value || undefined,
-    type: selectedType.value || undefined,
-    tag: selectedTag.value || undefined,
-    keyword: keyword.value || undefined
-  })
-  problems.value = data.items
-  total.value = data.total
+  try {
+    const data = await getProblems({
+      page: page.value,
+      page_size: pageSize,
+      category_id: selectedCategory.value || undefined,
+      difficulty: difficulty.value || undefined,
+      type: selectedType.value || undefined,
+      tag: selectedTag.value || undefined,
+      keyword: keyword.value || undefined
+    })
+    problems.value = Array.isArray(data?.items) ? data.items : []
+    total.value = typeof data?.total === 'number' ? data.total : 0
+  } catch (e) {
+    console.error('加载题目列表失败', e)
+    problems.value = []
+    total.value = 0
+  }
   syncUrl()
 }
 
@@ -207,153 +217,305 @@ onUnmounted(() => {
 
 // ===== 初始化 =====
 onMounted(async () => {
-  const [cats, tags] = await Promise.all([getCategories(), getAllTags()])
-  categories.value = cats
-  allTags.value = tags
+  try {
+    const [cats, tags] = await Promise.all([getCategories(), getAllTags()])
+    categories.value = Array.isArray(cats) ? cats : []
+    allTags.value = Array.isArray(tags) ? tags : []
+  } catch (e) {
+    console.error('加载分类/标签失败', e)
+    categories.value = []
+    allTags.value = []
+  }
   await loadProblems()
 })
 </script>
 
 <style scoped>
 .problem-list {
-  max-width: 900px;
+  max-width: 960px;
   margin: 0 auto;
-  padding: 20px;
+  padding: var(--spacing-xl) var(--spacing-lg);
 }
 
-h1 {
-  margin-bottom: 20px;
+/* ===== 页头 ===== */
+.page-header {
+  margin-bottom: var(--spacing-lg);
 }
 
+.page-header h1 {
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-xs);
+}
+
+.page-desc {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+  margin: 0;
+}
+
+/* ===== 分类导航 ===== */
 .category-nav {
   display: flex;
-  gap: 8px;
-  margin-bottom: 15px;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-lg);
   flex-wrap: wrap;
 }
 
 .cat-btn {
-  padding: 8px 16px;
-  border: 1px solid #ddd;
+  padding: 6px 18px;
+  border: 1px solid var(--color-border);
   border-radius: 20px;
-  background: white;
+  background: var(--color-bg-card);
+  color: var(--color-text-primary);
   cursor: pointer;
+  font-size: var(--font-size-small);
   transition: all 0.2s;
 }
 
 .cat-btn:hover {
-  border-color: #2563eb;
-  color: #2563eb;
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 .cat-btn.active {
-  background: #2563eb;
-  color: white;
-  border-color: #2563eb;
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  border-color: var(--color-primary);
+}
+
+/* ===== 卡片基础 ===== */
+.card {
+  background: var(--color-bg-card);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  transition: box-shadow 0.2s;
+}
+
+.card:hover {
+  box-shadow: var(--shadow-card-hover);
+}
+
+/* ===== 筛选卡片 ===== */
+.filters-card {
+  padding: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
 }
 
 .filters {
   display: flex;
-  gap: 8px;
-  margin-bottom: 20px;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.search-input {
+  flex: 1 1 200px;
+  min-width: 150px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-body);
+  outline: none;
+  transition: border-color 0.2s;
+  background: var(--color-bg-card);
+  color: var(--color-text-primary);
+}
+
+.search-input:focus {
+  border-color: var(--color-primary);
+}
+
+.filter-select {
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-card);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-body);
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.filter-select:focus {
+  border-color: var(--color-primary);
+}
+
+/* ===== 按钮 ===== */
+.btn-primary {
+  padding: 8px 20px;
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-body);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-primary:hover {
+  background: var(--color-primary-hover);
+}
+
+.btn-ghost {
+  padding: 8px 20px;
+  background: transparent;
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-body);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--color-primary-light);
+}
+
+.btn-ghost:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  color: var(--color-text-muted);
+  border-color: var(--color-border);
+}
+
+/* ===== 题目列表 ===== */
+.problem-list-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.problem-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md) var(--spacing-lg);
+  cursor: pointer;
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+
+.problem-row:hover {
+  transform: translateY(-1px);
+}
+
+.problem-id {
+  flex-shrink: 0;
+  min-width: 44px;
+  font-family: var(--font-family-mono);
+  font-size: 13px;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.problem-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.problem-title {
+  font-size: var(--font-size-body);
+  font-weight: 500;
+  color: var(--color-text-primary);
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.problem-tags {
+  display: flex;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
-.filters input {
-  flex: 1;
-  min-width: 150px;
-  padding: 8px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-}
-
-.filters select,
-.filters button {
-  padding: 8px 12px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background: white;
-  cursor: pointer;
-}
-
-.filters button:hover {
-  background: #f3f4f6;
-}
-
-.create-btn {
-  background: #16a34a !important;
-  color: white;
-  border-color: #16a34a !important;
-}
-
-.create-btn:hover {
-  background: #15803d !important;
-}
-
-.tag {
-  background: #e5e7eb;
-  padding: 2px 8px;
+.tag-pill {
+  padding: 1px 8px;
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  font-size: 11px;
   border-radius: 10px;
-  margin-right: 5px;
+}
+
+.problem-meta {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.type-badge {
+  padding: 2px 10px;
+  background: var(--color-tag-bg);
+  color: var(--color-tag-text);
   font-size: 12px;
-  display: inline-block;
+  border-radius: 12px;
+  white-space: nowrap;
 }
 
-table {
-  width: 100%;
-  border-collapse: collapse;
+.difficulty {
+  font-size: 13px;
+  color: var(--color-text-secondary);
 }
 
-th, td {
-  padding: 12px;
-  text-align: left;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-th {
-  background: #f9fafb;
-  font-weight: 600;
-}
-
-tbody tr {
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-tbody tr:hover {
-  background: #f9fafb;
+/* ===== 空状态 ===== */
+.empty-card {
+  padding: 60px 20px;
+  text-align: center;
 }
 
 .empty {
-  text-align: center;
-  color: #9ca3af;
-  margin-top: 30px;
-  padding: 40px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-body);
 }
 
+/* ===== 分页 ===== */
 .pagination {
-  margin-top: 20px;
+  margin-top: var(--spacing-lg);
   display: flex;
   justify-content: center;
-  gap: 15px;
   align-items: center;
+  gap: var(--spacing-md);
   flex-wrap: wrap;
 }
 
-.pagination button {
-  padding: 8px 16px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background: white;
-  cursor: pointer;
+.page-info {
+  font-size: var(--font-size-small);
+  color: var(--color-text-secondary);
 }
 
-.pagination button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+/* ===== 响应式 ===== */
+@media (max-width: 600px) {
+  .problem-list {
+    padding: var(--spacing-lg) var(--spacing-md);
+  }
 
-.pagination button:not(:disabled):hover {
-  background: #f3f4f6;
+  .problem-row {
+    padding: var(--spacing-md);
+    gap: var(--spacing-sm);
+  }
+
+  .problem-meta {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+  }
+
+  .filters {
+    gap: var(--spacing-xs);
+  }
+
+  .search-input {
+    flex: 1 1 100%;
+  }
+
+  .btn-primary,
+  .btn-ghost {
+    padding: 8px 14px;
+    font-size: var(--font-size-small);
+  }
 }
 </style>

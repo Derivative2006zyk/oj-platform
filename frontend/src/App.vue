@@ -18,6 +18,11 @@ import NavBar from './components/NavBar.vue'
   box-sizing: border-box;
 }
 
+html,
+body {
+  min-height: 100%;
+}
+
 body {
   font-family: var(--font-family-base);
   font-size: var(--font-size-body);
@@ -25,6 +30,12 @@ body {
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   background-color: var(--color-bg-page);
+}
+
+#app-root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 a {

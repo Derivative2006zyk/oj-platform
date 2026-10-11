@@ -2,7 +2,10 @@
   <main class="admin-page">
     <div class="container">
       <header class="page-header">
-        <h1>全局统计</h1>
+        <div class="page-header-main">
+          <h1>全局统计</h1>
+          <p class="page-desc">平台整体运营数据</p>
+        </div>
         <router-link to="/admin/users" class="btn-secondary">
           用户管理
         </router-link>
@@ -105,35 +108,47 @@ onMounted(load)
 }
 
 .container {
-  max-width: 1000px;
+  max-width: 960px;
   margin: 0 auto;
   padding: 0 var(--spacing-lg);
 }
 
+/* ===== 页头 ===== */
 .page-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-end;
   margin-bottom: var(--spacing-lg);
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
 }
 
-.page-header h1 {
-  font-size: 22px;
+.page-header-main h1 {
+  font-size: var(--font-size-title);
   font-weight: var(--font-weight-bold);
   color: var(--color-text-primary);
-  margin: 0;
+  margin: 0 0 var(--spacing-xs);
 }
 
+.page-desc {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+}
+
+/* ===== 按钮 ===== */
 .btn-secondary {
   padding: 8px 20px;
-  background: white;
+  background: var(--color-bg-card);
   color: var(--color-text-primary);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   font-size: var(--font-size-body);
   font-weight: 500;
+  font-family: inherit;
   cursor: pointer;
   text-decoration: none;
+  transition: border-color 0.2s, color 0.2s;
 }
 
 .btn-secondary:hover {
@@ -141,12 +156,18 @@ onMounted(load)
   color: var(--color-primary);
 }
 
+/* ===== 卡片 ===== */
 .card {
   background: var(--color-bg-card);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
   margin-bottom: var(--spacing-lg);
   overflow: hidden;
+  transition: box-shadow 0.2s;
+}
+
+.card:hover {
+  box-shadow: var(--shadow-card-hover);
 }
 
 .stat-section {
@@ -154,16 +175,15 @@ onMounted(load)
 }
 
 .section-title {
-  font-size: var(--font-size-small);
+  font-size: var(--font-size-body);
   font-weight: var(--font-weight-bold);
-  color: var(--color-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  color: var(--color-text-primary);
   margin-bottom: var(--spacing-md);
   padding-bottom: var(--spacing-sm);
   border-bottom: 1px solid var(--color-border-light);
 }
 
+/* ===== 网格 ===== */
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -175,6 +195,11 @@ onMounted(load)
   background: var(--color-sample-bg);
   border-radius: var(--radius-md);
   text-align: center;
+  transition: background 0.2s;
+}
+
+.stat-item:hover {
+  background: var(--color-primary-light);
 }
 
 .stat-value {
@@ -203,9 +228,22 @@ onMounted(load)
   color: var(--color-text-secondary);
 }
 
+/* ===== 空状态 ===== */
 .empty-state {
   text-align: center;
   padding: 60px 20px;
   color: var(--color-text-muted);
+}
+
+/* ===== 响应式 ===== */
+@media (max-width: 600px) {
+  .container {
+    padding: 0 var(--spacing-md);
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 </style>

@@ -3,6 +3,7 @@
     <div class="container">
       <header class="page-header">
         <h1>个人中心</h1>
+        <p class="page-desc">账号信息与刷题统计</p>
       </header>
 
       <!-- ===== 账号信息 ===== -->
@@ -237,10 +238,16 @@ onMounted(loadStats)
 }
 
 .page-header h1 {
-  font-size: 22px;
+  font-size: var(--font-size-title);
   font-weight: var(--font-weight-bold);
   color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-xs);
+}
+
+.page-desc {
   margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
 }
 
 /* ===== 卡片基础 ===== */
@@ -260,11 +267,9 @@ onMounted(loadStats)
 .card-header {
   padding: var(--spacing-md) var(--spacing-lg);
   border-bottom: 1px solid var(--color-border-light);
-  font-size: var(--font-size-small);
+  font-size: var(--font-size-body);
   font-weight: var(--font-weight-bold);
   color: var(--color-text-primary);
-  letter-spacing: 0.3px;
-  text-transform: uppercase;
 }
 
 .empty-state {
@@ -291,15 +296,15 @@ onMounted(loadStats)
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #0066cc, #3399ff);
-  color: white;
+  background: var(--color-primary);
+  color: var(--color-primary-text);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 24px;
   font-weight: 700;
   flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+  box-shadow: 0 4px 12px rgba(0, 102, 204, 0.2);
 }
 
 .user-meta {
@@ -387,7 +392,7 @@ onMounted(loadStats)
 }
 
 .stat-card:hover {
-  background: #f0f2f5;
+  background: var(--color-primary-light);
 }
 
 .stat-value {
@@ -454,7 +459,7 @@ onMounted(loadStats)
 
 .lang-bar {
   height: 100%;
-  background: linear-gradient(90deg, #0066cc, #3399ff);
+  background: var(--color-primary);
   border-radius: 4px;
   transition: width 0.4s ease;
 }
@@ -478,7 +483,7 @@ onMounted(loadStats)
 .form-item label {
   display: block;
   margin-bottom: 6px;
-  font-size: var(--font-size-body);
+  font-size: var(--font-size-small);
   color: var(--color-text-secondary);
 }
 
@@ -488,6 +493,9 @@ onMounted(loadStats)
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   font-size: var(--font-size-body);
+  font-family: inherit;
+  background: var(--color-bg-card);
+  color: var(--color-text-primary);
   box-sizing: border-box;
   outline: none;
   transition: border-color 0.2s;
@@ -506,6 +514,7 @@ onMounted(loadStats)
   border-radius: var(--radius-md);
   font-size: var(--font-size-body);
   font-weight: 500;
+  font-family: inherit;
   cursor: pointer;
   transition: background 0.2s;
 }
