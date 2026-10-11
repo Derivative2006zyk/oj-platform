@@ -67,7 +67,7 @@ const router = createRouter({
   routes,
 })
 
-router.beforeEach((to, from, next) => {
+router.beforeEach((to, _from, next) => {
   const token = localStorage.getItem('oj_token')
   const userRaw = localStorage.getItem('oj_user')
 

@@ -266,7 +266,6 @@ import {
 } from '../api/submission'
 import { openSubmissionWS, type SubmissionWSHandle, type WSMessage } from '../utils/ws'
 import { useUserStore } from '../stores/user'
-import { refreshTrayFromBackend } from '../utils/tauri'
 
 const route = useRoute()
 const userStore = useUserStore()
