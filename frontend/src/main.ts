@@ -6,12 +6,14 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
 import { refreshTrayFromBackend } from './utils/tauri'
+import { syncTokenFromLocalStorage } from './utils/native'
 
 const app = createApp(App)
 
 app.use(createPinia())
 app.use(router)
 app.mount('#app')
+syncTokenFromLocalStorage().catch(() => {})
 
 // 启动时若已登录，刷新托盘 tooltip
 const token = localStorage.getItem('oj_token')

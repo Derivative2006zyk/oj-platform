@@ -4,6 +4,7 @@ import { ref, computed } from 'vue'
 import * as authApi from '../api/auth'
 import type { UserInfo, RegisterPayload, LoginPayload } from '../api/auth'
 import { refreshTrayFromBackend, updateTrayTooltip } from '../utils/tauri'
+import { syncTokenToNative, clearTokenFromNative } from '../utils/native'
 
 const TOKEN_KEY = 'oj_token'
 const USER_KEY = 'oj_user'
@@ -56,6 +57,7 @@ export const useUserStore = defineStore('user', () => {
     // 先存 token，让拦截器能带上
     token.value = res.access_token
     localStorage.setItem(TOKEN_KEY, res.access_token)
+    await syncTokenToNative(res.access_token)
 
     // 拉用户信息
     const u = await fetchMe()
@@ -69,6 +71,7 @@ export const useUserStore = defineStore('user', () => {
   function logout() {
     clearSession()
     updateTrayTooltip('OJ Platform').catch(() => {})
+    clearTokenFromNative().catch(() => {})
   }
 
   return {
