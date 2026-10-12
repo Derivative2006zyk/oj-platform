@@ -4,8 +4,10 @@ export interface SubmissionDetail {
   id: number
   user_id: number
   problem_id: number
-  code: string
+  submission_kind: string
+  code: string | null
   language: string
+  answer_data: Record<string, any> | null
   status: string
   runtime_ms: number | null
   memory_kb: number | null
@@ -17,8 +19,9 @@ export interface SubmissionDetail {
 
 export interface SubmissionCreate {
   problem_id: number
-  code: string
+  code?: string | null
   language: string
+  answer_data?: Record<string, any> | null
 }
 
 export async function submitCode(data: SubmissionCreate): Promise<SubmissionDetail> {
