@@ -108,6 +108,7 @@
             </div>
           </section>
         </article>
+
         <!-- 我的提交历史 -->
         <section
           v-if="userStore.isLoggedIn"
@@ -131,25 +132,22 @@
               :key="item.id"
               class="history-row"
             >
-              <!-- 左侧：状态徽章 + 耗时 -->
               <div class="history-left">
                 <span :class="['status-badge', `status-${item.status}`]">
                   {{ statusLabel(item.status) }}
                 </span>
                 <span class="history-runtime">
-                  {{ item.runtime_ms != null ? item.runtime_ms + ' ms' : '—' }}
+                  {{ item.runtime_ms != null && item.runtime_ms > 0 ? item.runtime_ms + ' ms' : '—' }}
                 </span>
               </div>
 
-              <!-- 中间：测试点 + 语言 -->
               <div class="history-mid">
                 <span class="history-cases">
                   {{ item.passed_cases }} / {{ item.total_cases }}
                 </span>
-                <span class="history-lang">{{ item.language }}</span>
+                <span class="history-lang">{{ languageLabel(item.language) }}</span>
               </div>
 
-              <!-- 右侧：时间 -->
               <div class="history-right">
                 {{ formatTime(item.created_at) }}
               </div>
@@ -160,7 +158,7 @@
 
       <!-- ========== 右栏：提交面板 ========== -->
       <aside class="right-col">
-        <!-- 提交面板 -->
+        <!-- 算法题：代码提交面板 -->
         <div v-if="problem.type === 'algorithm'" class="card submit-panel">
           <div class="card-header">
             <span>代码提交</span>
@@ -198,7 +196,6 @@
               {{ submitting ? '提交中...' : '提交' }}
             </button>
 
-            <!-- 判题结果 -->
             <div v-if="currentSubmission" class="submission-result">
               <div class="result-row">
                 <span class="result-label">状态</span>
@@ -216,6 +213,63 @@
               >
                 <span class="result-label">耗时</span>
                 <span>{{ currentSubmission.runtime_ms }} ms</span>
+              </div>
+              <pre
+                v-if="currentSubmission.error_message"
+                class="error-message"
+              >{{ currentSubmission.error_message }}</pre>
+            </div>
+          </template>
+        </div>
+
+        <!-- 选择题：作答面板 -->
+        <div v-else-if="problem.type === 'choice'" class="card submit-panel">
+          <div class="card-header">
+            <span>选择题作答</span>
+          </div>
+
+          <div v-if="!userStore.isLoggedIn" class="login-tip">
+            请先 <router-link to="/login">登录</router-link> 后提交
+          </div>
+
+          <template v-else>
+            <div class="choice-options">
+              <label
+                v-for="(opt, idx) in problem.options || []"
+                :key="opt.key || idx"
+                :class="['choice-option', { selected: choiceSelected === (opt.key || String.fromCharCode(65 + idx)) }]"
+              >
+                <input
+                  type="radio"
+                  name="choice-answer"
+                  :value="opt.key || String.fromCharCode(65 + idx)"
+                  v-model="choiceSelected"
+                />
+                <span class="choice-key">{{ opt.key || String.fromCharCode(65 + idx) }}.</span>
+                <span class="choice-content">{{ opt.content }}</span>
+              </label>
+            </div>
+
+            <div v-if="submitError" class="error">{{ submitError }}</div>
+
+            <button
+              class="btn-primary"
+              :disabled="submitting || !choiceSelected"
+              @click="onSubmitChoice"
+            >
+              {{ submitting ? '提交中...' : '提交' }}
+            </button>
+
+            <div v-if="currentSubmission" class="submission-result">
+              <div class="result-row">
+                <span class="result-label">状态</span>
+                <span :class="['status-badge', `status-${currentSubmission.status}`]">
+                  {{ statusLabel(currentSubmission.status) }}
+                </span>
+              </div>
+              <div class="result-row">
+                <span class="result-label">结果</span>
+                <span>{{ currentSubmission.passed_cases }} / {{ currentSubmission.total_cases }}</span>
               </div>
               <pre
                 v-if="currentSubmission.error_message"
@@ -284,12 +338,15 @@ const submitPanel = reactive({
   code: '',
 })
 
+// ===== 选择题状态 =====
+const choiceSelected = ref<string>('')
+
 const submitting = ref(false)
 const submitError = ref('')
 const currentSubmission = ref<SubmissionDetail | null>(null)
 const wsHandle = ref<SubmissionWSHandle | null>(null)
 
-  // ===== 提交历史 =====
+// ===== 提交历史 =====
 interface HistoryItem {
   id: number
   language: string
@@ -340,6 +397,15 @@ function statusLabel(status: string): string {
     CE: '编译错误',
   }
   return map[status] || status
+}
+
+function languageLabel(lang: string): string {
+  if (lang === 'choice') return '选择题'
+  if (lang === 'fill_blank') return '填空题'
+  if (lang === 'python') return 'Python'
+  if (lang === 'java') return 'Java'
+  if (lang === 'cpp') return 'C++'
+  return lang
 }
 
 async function loadProblem() {
@@ -394,6 +460,7 @@ function formatTime(s: string): string {
   }
 }
 
+// ===== 算法题提交 =====
 async function onSubmit() {
   submitError.value = ''
 
@@ -418,8 +485,43 @@ async function onSubmit() {
 
     currentSubmission.value = sub
     openWS(sub.id)
+    loadMySubmissions()
+  } catch (e: any) {
+    const status = e?.response?.status
+    if (status === 401) {
+      submitError.value = '登录已过期，请重新登录'
+    } else {
+      submitError.value = e?.response?.data?.detail || '提交失败，请稍后重试'
+    }
+  } finally {
+    submitting.value = false
+  }
+}
 
-    // 刷新历史列表（新记录 PENDING）
+// ===== 选择题提交（同步判题） =====
+async function onSubmitChoice() {
+  submitError.value = ''
+
+  if (!userStore.isLoggedIn) {
+    submitError.value = '请先登录'
+    return
+  }
+  if (!choiceSelected.value) {
+    submitError.value = '请选择一个选项'
+    return
+  }
+
+  submitting.value = true
+
+  try {
+    const sub = await submitCode({
+      problem_id: problemId.value,
+      language: 'choice',
+      answer_data: { selected: choiceSelected.value },
+    })
+
+    currentSubmission.value = sub
+    // 同步判题，返回时已是终态，不打开 WebSocket
     loadMySubmissions()
   } catch (e: any) {
     const status = e?.response?.status
@@ -458,10 +560,8 @@ function openWS(submissionId: number) {
           wsHandle.value.close()
           wsHandle.value = null
         }
-        // 判题完成，刷新历史列表
         loadMySubmissions()
 
-        // 刷新托盘 tooltip
         const token = localStorage.getItem('oj_token')
         if (token) {
           import('../utils/tauri').then(({ refreshTrayFromBackend }) => {
@@ -630,7 +730,7 @@ onUnmounted(() => {
   margin: 0;
 }
 
-/* 选项 */
+/* 选项（题目描述中展示） */
 .options {
   display: flex;
   flex-direction: column;
@@ -750,6 +850,7 @@ onUnmounted(() => {
   text-align: center;
   padding: 20px;
 }
+
 /* ===== 提交历史卡片 ===== */
 .history-card {
   margin-top: var(--spacing-lg);
@@ -803,7 +904,6 @@ onUnmounted(() => {
   background: var(--color-primary-light);
 }
 
-/* 左侧：状态 + 耗时 */
 .history-left {
   display: flex;
   flex-direction: column;
@@ -819,7 +919,6 @@ onUnmounted(() => {
   font-family: var(--font-family-mono);
 }
 
-/* 中间：测试点 + 语言 */
 .history-mid {
   flex: 1;
   display: flex;
@@ -845,14 +944,12 @@ onUnmounted(() => {
   font-family: var(--font-family-mono);
 }
 
-/* 右侧：时间 */
 .history-right {
   font-size: 12px;
   color: var(--color-text-muted);
   flex-shrink: 0;
 }
 
-/* 响应式 */
 @media (max-width: 600px) {
   .history-row {
     flex-wrap: wrap;
@@ -1077,6 +1174,7 @@ onUnmounted(() => {
   background: rgba(0, 0, 0, 0.04);
   color: var(--color-primary);
 }
+
 .editor-wrapper {
   margin: 0 var(--spacing-md) var(--spacing-sm);
   border-radius: var(--radius-md);
@@ -1087,5 +1185,52 @@ onUnmounted(() => {
   min-height: 200px;
   max-height: 800px;
   height: 360px;
+}
+
+/* ===== 选择题选项 ===== */
+.choice-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin: var(--spacing-md);
+}
+
+.choice-option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  padding: 10px 14px;
+  background: var(--color-sample-bg);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.choice-option:hover {
+  border-color: var(--color-primary);
+}
+
+.choice-option.selected {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.choice-option input[type="radio"] {
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
+.choice-key {
+  font-weight: 600;
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.choice-content {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-body);
+  line-height: 1.5;
+  word-break: break-word;
 }
 </style>

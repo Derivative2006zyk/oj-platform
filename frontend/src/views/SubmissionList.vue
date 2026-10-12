@@ -1,7 +1,6 @@
 <template>
   <main class="submission-page">
     <div class="container">
-      <!-- 页面标题栏 -->
       <header class="page-header">
         <div class="page-header-main">
           <h1>我的提交</h1>
@@ -22,7 +21,6 @@
         </div>
       </header>
 
-      <!-- 列表卡片 -->
       <section class="card">
         <div v-if="loading" class="empty-state">加载中...</div>
         <div v-else-if="items.length === 0" class="empty-state">
@@ -52,7 +50,7 @@
                 </router-link>
               </td>
               <td class="col-lang">
-                <span class="lang-badge">{{ item.language }}</span>
+                <span class="lang-badge">{{ languageLabel(item.language) }}</span>
               </td>
               <td class="col-status">
                 <span :class="['status-badge', `status-${item.status}`]">
@@ -63,14 +61,13 @@
                 {{ item.passed_cases }} / {{ item.total_cases }}
               </td>
               <td class="col-runtime">
-                {{ item.runtime_ms != null ? item.runtime_ms + ' ms' : '-' }}
+                {{ item.runtime_ms != null && item.runtime_ms > 0 ? item.runtime_ms + ' ms' : '-' }}
               </td>
               <td class="col-time">{{ formatTime(item.created_at) }}</td>
             </tr>
           </tbody>
         </table>
 
-        <!-- 分页 -->
         <div v-if="totalPages > 1" class="pagination">
           <button
             class="page-btn"
@@ -130,6 +127,15 @@ function statusLabel(status: string): string {
     CE: '编译错误',
   }
   return map[status] || status
+}
+
+function languageLabel(lang: string): string {
+  if (lang === 'choice') return '选择题'
+  if (lang === 'fill_blank') return '填空题'
+  if (lang === 'python') return 'Python'
+  if (lang === 'java') return 'Java'
+  if (lang === 'cpp') return 'C++'
+  return lang
 }
 
 function formatTime(s: string): string {
