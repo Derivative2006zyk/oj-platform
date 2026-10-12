@@ -7,23 +7,86 @@ from app.models.submission import Submission
 from app.schemas.submission import SubmissionCreate
 
 
+def _infer_submission_kind(language: str) -> str:
+    if language == "choice":
+        return "choice"
+    if language == "fill_blank":
+        return "fill_blank"
+    return "code"
+
+
 async def create_submission(
     db: AsyncSession,
     user_id: int,
     data: SubmissionCreate,
 ) -> Submission:
     """写 submissions 表，status=PENDING。"""
+    kind = _infer_submission_kind(data.language)
+
     sub = Submission(
         user_id=user_id,
         problem_id=data.problem_id,
+        submission_kind=kind,
         code=data.code,
         language=data.language,
+        answer_data=data.answer_data,
         status="PENDING",
     )
     db.add(sub)
     await db.commit()
     await db.refresh(sub)
     return sub
+
+
+async def judge_inline(db: AsyncSession, sub: Submission) -> None:
+    """同步判题：选择题。仅用于 submission_kind != code。"""
+    from app.models.problem import Problem
+    from app.plugins.judge_plugin.judge_choice import judge_choice
+    from app.core.event_bus import get_event_bus
+    from app.core.events import EventNames
+
+    problem = await db.get(Problem, sub.problem_id)
+    if problem is None:
+        sub.status = "RE"
+        sub.error_message = "Problem not found"
+        await db.commit()
+        await db.refresh(sub)
+        return
+
+    if sub.submission_kind == "choice":
+        verdict = judge_choice(sub.answer_data, problem.options)
+    elif sub.submission_kind == "fill_blank":
+        verdict = {
+            "status": "RE",
+            "passed_cases": 0,
+            "total_cases": 0,
+            "runtime_ms": 0,
+            "error_message": "fill_blank judge not implemented yet",
+        }
+    else:
+        return
+
+    sub.status = verdict["status"]
+    sub.passed_cases = verdict["passed_cases"]
+    sub.total_cases = verdict["total_cases"]
+    sub.runtime_ms = verdict["runtime_ms"]
+    sub.error_message = verdict.get("error_message")
+
+    await db.commit()
+    await db.refresh(sub)
+
+    await get_event_bus().publish(
+        EventNames.SUBMISSION_JUDGED,
+        {
+            "id": sub.id,
+            "status": sub.status,
+            "user_id": sub.user_id,
+            "problem_id": sub.problem_id,
+            "passed_cases": sub.passed_cases,
+            "total_cases": sub.total_cases,
+            "runtime_ms": sub.runtime_ms,
+        },
+    )
 
 
 async def get_submission(
@@ -100,18 +163,17 @@ async def list_submissions_for_problem(
         "items": items,
     }
 
+
 async def get_widget_summary(db: AsyncSession, user_id: int) -> dict:
     """桌面小组件摘要数据。"""
     from datetime import datetime, timezone
     from sqlalchemy import func, distinct
     from app.models.problem import Problem
 
-    # 1. 总提交数
     total = (await db.execute(
         select(func.count()).where(Submission.user_id == user_id)
     )).scalar() or 0
 
-    # 2. 今日提交数（UTC 当日 0 点起）
     today_start = datetime.now(timezone.utc).replace(
         tzinfo=None,
         hour=0,
@@ -126,7 +188,6 @@ async def get_widget_summary(db: AsyncSession, user_id: int) -> dict:
         )
     )).scalar() or 0
 
-    # 3. AC 数
     accepted = (await db.execute(
         select(func.count()).where(
             Submission.user_id == user_id,
@@ -134,7 +195,6 @@ async def get_widget_summary(db: AsyncSession, user_id: int) -> dict:
         )
     )).scalar() or 0
 
-    # 4. 已解题数（distinct problem_id 且 AC）
     solved = (await db.execute(
         select(func.count(distinct(Submission.problem_id))).where(
             Submission.user_id == user_id,
@@ -142,15 +202,12 @@ async def get_widget_summary(db: AsyncSession, user_id: int) -> dict:
         )
     )).scalar() or 0
 
-    # 5. 题目总数
     total_problems = (await db.execute(
         select(func.count()).select_from(Problem)
     )).scalar() or 0
 
-    # 6. 通过率
     acceptance_rate = (accepted / total * 100) if total > 0 else 0.0
 
-    # 7. 最近一次提交
     latest_result = await db.execute(
         select(Submission)
         .where(Submission.user_id == user_id)

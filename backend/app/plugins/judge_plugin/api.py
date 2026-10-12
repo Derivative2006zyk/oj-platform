@@ -33,10 +33,13 @@ async def submit(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """提交代码，写 DB 并入队。"""
+    """提交。算法题入队异步判题；选择题/填空题同步判题。"""
     sub = await service.create_submission(db, current_user.id, data)
 
-    await enqueue("judge_submit", submission_id=sub.id)
+    if sub.submission_kind == "code":
+        await enqueue("judge_submit", submission_id=sub.id)
+    else:
+        await service.judge_inline(db, sub)
 
     return sub
 
