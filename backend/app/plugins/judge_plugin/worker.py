@@ -22,23 +22,29 @@ async def shutdown(ctx):
 
 
 async def judge_submit(ctx, submission_id: int) -> None:
-    """判题任务。"""
+    """判题任务（仅处理 code 类提交）。"""
     from app.database import async_session
     from app.models.submission import Submission
     from app.models.problem import Problem
     from app.models.test_case import TestCase
-    from app.plugins.judge_plugin.judge_python import judge_python
 
     async with async_session() as db:
         sub = await db.get(Submission, submission_id)
         if sub is None:
             return
-
-        # 只处理 PENDING
         if sub.status != "PENDING":
             return
 
-        # 读测试点
+        if getattr(sub, "submission_kind", "code") != "code":
+            return
+
+        problem = await db.get(Problem, sub.problem_id)
+        if problem is None:
+            sub.status = "RE"
+            sub.error_message = "Problem not found"
+            await db.commit()
+            return
+
         result = await db.execute(
             select(TestCase)
             .where(TestCase.problem_id == sub.problem_id)
@@ -55,7 +61,6 @@ async def judge_submit(ctx, submission_id: int) -> None:
             for tc in test_cases
         ]
 
-        # 判题
         if sub.language == "python":
             verdict = judge_python(sub.code, cases)
         elif sub.language == "java":
@@ -91,7 +96,6 @@ async def judge_submit(ctx, submission_id: int) -> None:
                 "runtime_ms": sub.runtime_ms,
             },
         )
-
 
 class WorkerSettings:
     functions = [judge_submit]
