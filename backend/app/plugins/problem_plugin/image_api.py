@@ -120,3 +120,65 @@ async def get_image(image_id: int, db: AsyncSession = Depends(get_db)):
 async def get_image_legacy(image_id: int, db: AsyncSession = Depends(get_db)):
     """兼容旧 URL（单数）"""
     return await get_image(image_id, db)
+
+
+from fastapi import UploadFile, File, Depends, HTTPException, status as http_status
+from app.core.security import get_current_user
+from app.models.user import User
+
+
+@router.post(
+    "/images/upload",
+    status_code=http_status.HTTP_201_CREATED,
+)
+async def upload_user_image(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """登录用户上传图片，用于证明题提交等场景。"""
+    # 校验类型
+    allowed = {"image/png", "image/jpeg", "image/webp", "image/gif"}
+    if file.content_type not in allowed:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported image type: {file.content_type}",
+        )
+
+    # 校验大小（5MB）
+    content = await file.read()
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail="Image exceeds 5MB",
+        )
+
+    # 落盘
+    import uuid
+    from pathlib import Path
+    from app.core.config import settings
+
+    ext = Path(file.filename or "image.png").suffix or ".png"
+    file_name = f"{uuid.uuid4().hex}{ext}"
+
+    upload_dir = Path(settings.UPLOAD_DIR) / "submissions"
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    file_path = upload_dir / file_name
+    file_path.write_bytes(content)
+
+    # 写 images 表
+    from app.models.image import Image
+
+    img = Image(
+        problem_id=None,
+        file_name=file.filename or file_name,
+        file_path=str(file_path),
+        file_size=len(content),
+        mime_type=file.content_type,
+        upload_by=str(current_user.id),
+    )
+    db.add(img)
+    await db.commit()
+    await db.refresh(img)
+
+    return {"id": img.id, "url": f"/api/images/{img.id}"}
