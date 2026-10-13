@@ -9,6 +9,8 @@ def _infer_submission_kind(language: str) -> str:
         return "choice"
     if language == "fill_blank":
         return "fill_blank"
+    if language == "proof":
+        return "proof"
     return "code"
 
 
@@ -26,7 +28,7 @@ class SubmissionCreate(BaseModel):
                 raise ValueError("code is required for code submissions")
         else:
             if self.answer_data is None:
-                raise ValueError("answer_data is required for choice/fill_blank submissions")
+                raise ValueError("answer_data is required for choice/fill_blank/proof submissions")
         return self
 
 
