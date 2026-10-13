@@ -20,13 +20,11 @@
             </div>
           </header>
 
-          <!-- 题目描述 -->
           <section class="desc-section">
             <h2>题目描述</h2>
             <MarkdownRenderer :content="problem.description" />
           </section>
 
-          <!-- 选择题 -->
           <section v-if="problem.type === 'choice' && problem.options" class="desc-section">
             <h2>选项</h2>
             <div class="options">
@@ -37,7 +35,6 @@
             </div>
           </section>
 
-          <!-- 填空题 -->
           <section v-if="problem.type === 'fill_blank' && problem.blanks" class="desc-section">
             <h2>空位</h2>
             <div class="blanks">
@@ -48,7 +45,6 @@
             </div>
           </section>
 
-          <!-- 算法题示例 -->
           <section
             v-if="problem.type === 'algorithm' && problem.test_cases && problem.test_cases.length"
             class="desc-section"
@@ -72,7 +68,6 @@
             </div>
           </section>
 
-          <!-- 科研题 -->
           <section
             v-if="problem.type === 'research' && problem.subprojects && problem.subprojects.length"
             class="desc-section"
@@ -85,7 +80,6 @@
             </div>
           </section>
 
-          <!-- 答案 -->
           <section class="desc-section answer-section">
             <div class="section-header">
               <h2>答案</h2>
@@ -160,8 +154,16 @@
       <aside class="right-col">
         <!-- 算法题：代码提交面板 -->
         <div v-if="problem.type === 'algorithm'" class="card submit-panel">
-          <div class="card-header">
+          <div class="card-header panel-header-with-action">
             <span>代码提交</span>
+            <button
+              v-if="hasDraft"
+              type="button"
+              class="clear-draft-btn"
+              @click="onClearDraft"
+            >
+              清空
+            </button>
           </div>
 
           <div v-if="!userStore.isLoggedIn" class="login-tip">
@@ -224,8 +226,16 @@
 
         <!-- 选择题：作答面板 -->
         <div v-else-if="problem.type === 'choice'" class="card submit-panel">
-          <div class="card-header">
+          <div class="card-header panel-header-with-action">
             <span>选择题作答</span>
+            <button
+              v-if="hasDraft"
+              type="button"
+              class="clear-draft-btn"
+              @click="onClearDraft"
+            >
+              清空
+            </button>
           </div>
 
           <div v-if="!userStore.isLoggedIn" class="login-tip">
@@ -279,6 +289,159 @@
           </template>
         </div>
 
+        <!-- 填空题：作答面板 -->
+        <div v-else-if="problem.type === 'fill_blank'" class="card submit-panel">
+          <div class="card-header panel-header-with-action">
+            <span>填空题作答</span>
+            <button
+              v-if="hasDraft"
+              type="button"
+              class="clear-draft-btn"
+              @click="onClearDraft"
+            >
+              清空
+            </button>
+          </div>
+
+          <div v-if="!userStore.isLoggedIn" class="login-tip">
+            请先 <router-link to="/login">登录</router-link> 后提交
+          </div>
+
+          <template v-else>
+            <div class="blank-inputs">
+              <div
+                v-for="(b, idx) in problem.blanks || []"
+                :key="idx"
+                class="blank-input-item"
+              >
+                <label class="blank-input-label">
+                  第 {{ b.blank_index || idx + 1 }} 空
+                </label>
+                <input
+                  v-model="fillBlanks[idx]"
+                  type="text"
+                  class="blank-input"
+                  :placeholder="`答案 ${idx + 1}`"
+                  @keyup.enter="onSubmitFillBlank"
+                />
+              </div>
+            </div>
+
+            <div v-if="submitError" class="error">{{ submitError }}</div>
+
+            <button
+              class="btn-primary"
+              :disabled="submitting || !hasAnyBlankFilled"
+              @click="onSubmitFillBlank"
+            >
+              {{ submitting ? '提交中...' : '提交' }}
+            </button>
+
+            <div v-if="currentSubmission" class="submission-result">
+              <div class="result-row">
+                <span class="result-label">状态</span>
+                <span :class="['status-badge', `status-${currentSubmission.status}`]">
+                  {{ statusLabel(currentSubmission.status) }}
+                </span>
+              </div>
+              <div class="result-row">
+                <span class="result-label">正确空数</span>
+                <span>{{ currentSubmission.passed_cases }} / {{ currentSubmission.total_cases }}</span>
+              </div>
+              <pre
+                v-if="currentSubmission.error_message"
+                class="error-message"
+              >{{ currentSubmission.error_message }}</pre>
+            </div>
+          </template>
+        </div>
+
+        <!-- 证明题：作答面板 -->
+        <div v-else-if="problem.type === 'proof'" class="card submit-panel">
+          <div class="card-header panel-header-with-action">
+            <span>证明题作答</span>
+            <button
+              v-if="hasDraft"
+              type="button"
+              class="clear-draft-btn"
+              @click="onClearDraft"
+            >
+              清空
+            </button>
+          </div>
+
+          <div v-if="!userStore.isLoggedIn" class="login-tip">
+            请先 <router-link to="/login">登录</router-link> 后提交
+          </div>
+
+          <template v-else>
+            <div class="proof-form">
+              <div class="form-group">
+                <label class="form-label">证明过程（文字）</label>
+                <div class="proof-textarea-wrapper">
+                  <textarea
+                    v-model="proofText"
+                    class="proof-textarea"
+                    placeholder="可直接书写证明过程。"
+                  ></textarea>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">上传图片（可多张）</label>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  multiple
+                  class="proof-file-input"
+                  @change="handleProofImageSelect"
+                />
+                <p v-if="proofUploading" class="proof-uploading">上传中...</p>
+              </div>
+
+              <div v-if="proofImages.length > 0" class="proof-image-grid">
+                <div
+                  v-for="img in proofImages"
+                  :key="img.id"
+                  class="proof-image-item"
+                >
+                  <img :src="img.url" :alt="`图片 ${img.id}`" />
+                  <button
+                    type="button"
+                    class="proof-image-remove"
+                    title="移除"
+                    @click="removeProofImage(img.id)"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="submitError" class="error">{{ submitError }}</div>
+
+            <button
+              class="btn-primary"
+              :disabled="submitting || !canSubmitProof"
+              @click="onSubmitProof"
+            >
+              {{ submitting ? '提交中...' : '提交' }}
+            </button>
+
+            <div v-if="currentSubmission" class="submission-result">
+              <div class="result-row">
+                <span class="result-label">状态</span>
+                <span :class="['status-badge', `status-${currentSubmission.status}`]">
+                  {{ statusLabel(currentSubmission.status) }}
+                </span>
+              </div>
+              <p class="proof-hint">
+                证明题不自动判题，请自行核对或等待后续版本的人工/AI 评审。
+              </p>
+            </div>
+          </template>
+        </div>
+
         <!-- 题目信息 -->
         <div class="card info-card">
           <div class="card-header">
@@ -298,7 +461,6 @@
           </div>
         </div>
 
-        <!-- 返回 -->
         <router-link to="/" class="back-link">← 返回题目列表</router-link>
       </aside>
     </div>
@@ -306,7 +468,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 
 import MarkdownRenderer from '../components/MarkdownRenderer.vue'
@@ -318,8 +480,10 @@ import {
   listProblemSubmissions,
   type SubmissionDetail,
 } from '../api/submission'
+import { uploadUserImage } from '../api/image'
 import { openSubmissionWS, type SubmissionWSHandle, type WSMessage } from '../utils/ws'
 import { useUserStore } from '../stores/user'
+import { loadDraft, saveDraft, clearDraft, type DraftImage } from '../utils/draft'
 
 const route = useRoute()
 const userStore = useUserStore()
@@ -332,7 +496,7 @@ const problem = ref<ProblemDetail | null>(null)
 const answer = ref<{ answer?: string | null; explanation?: string | null } | null>(null)
 const answerVisible = ref(false)
 
-// ===== 提交面板状态 =====
+// ===== 算法题提交面板状态 =====
 const submitPanel = reactive({
   language: 'python',
   code: '',
@@ -340,6 +504,33 @@ const submitPanel = reactive({
 
 // ===== 选择题状态 =====
 const choiceSelected = ref<string>('')
+
+// ===== 填空题状态 =====
+const fillBlanks = ref<string[]>([])
+
+const hasAnyBlankFilled = computed(() =>
+  fillBlanks.value.some((s) => (s ?? '').trim() !== '')
+)
+
+// ===== 证明题状态 =====
+const proofText = ref('')
+const proofImages = ref<DraftImage[]>([])
+const proofUploading = ref(false)
+
+const canSubmitProof = computed(() => {
+  return proofText.value.trim().length > 0 || proofImages.value.length > 0
+})
+
+// ===== 草稿状态 =====
+const hasDraft = computed(() => {
+  if (!problem.value) return false
+  const t = problem.value.type
+  if (t === 'algorithm') return submitPanel.code.trim() !== ''
+  if (t === 'choice') return choiceSelected.value !== ''
+  if (t === 'fill_blank') return hasAnyBlankFilled.value
+  if (t === 'proof') return canSubmitProof.value
+  return false
+})
 
 const submitting = ref(false)
 const submitError = ref('')
@@ -395,6 +586,7 @@ function statusLabel(status: string): string {
     MLE: '内存超限',
     RE: '运行错误',
     CE: '编译错误',
+    SUBMITTED: '已提交',
   }
   return map[status] || status
 }
@@ -402,6 +594,7 @@ function statusLabel(status: string): string {
 function languageLabel(lang: string): string {
   if (lang === 'choice') return '选择题'
   if (lang === 'fill_blank') return '填空题'
+  if (lang === 'proof') return '证明题'
   if (lang === 'python') return 'Python'
   if (lang === 'java') return 'Java'
   if (lang === 'cpp') return 'C++'
@@ -413,9 +606,50 @@ async function loadProblem() {
   try {
     const data = await getProblemDetail(problemId.value)
     problem.value = data
+
+    const draft = loadDraft(data.id)
+
+    // 填空题初始化输入数组
+    if (data.type === 'fill_blank') {
+      const total = Array.isArray(data.blanks) ? data.blanks.length : 0
+      const saved = Array.isArray(draft.fillBlanks) ? draft.fillBlanks : []
+      fillBlanks.value = new Array(total).fill('').map((_, i) => saved[i] ?? '')
+    } else {
+      fillBlanks.value = []
+    }
+
+    // 恢复草稿：算法题
+    if (data.type === 'algorithm') {
+      submitPanel.language = draft.language || 'python'
+      submitPanel.code = draft.code || ''
+    } else {
+      submitPanel.language = 'python'
+      submitPanel.code = ''
+    }
+
+    // 恢复草稿：选择题
+    if (data.type === 'choice') {
+      choiceSelected.value = draft.choiceSelected || ''
+    } else {
+      choiceSelected.value = ''
+    }
+
+    // 恢复草稿：证明题
+    if (data.type === 'proof') {
+      proofText.value = draft.proofText || ''
+      proofImages.value = Array.isArray(draft.proofImages) ? draft.proofImages : []
+    } else {
+      proofText.value = ''
+      proofImages.value = []
+    }
   } catch (e) {
     console.error('加载题目失败', e)
     problem.value = null
+    fillBlanks.value = []
+    proofText.value = ''
+    proofImages.value = []
+    submitPanel.code = ''
+    choiceSelected.value = ''
   } finally {
     loading.value = false
   }
@@ -460,6 +694,91 @@ function formatTime(s: string): string {
   }
 }
 
+// ===== 草稿保存 =====
+let draftTimer: number | null = null
+
+function scheduleDraftSave() {
+  if (!problem.value) return
+  if (draftTimer) window.clearTimeout(draftTimer)
+  draftTimer = window.setTimeout(() => {
+    if (!problem.value) return
+    const id = problem.value.id
+    const t = problem.value.type
+    if (t === 'algorithm') {
+      saveDraft(id, { language: submitPanel.language, code: submitPanel.code })
+    } else if (t === 'choice') {
+      saveDraft(id, { choiceSelected: choiceSelected.value })
+    } else if (t === 'fill_blank') {
+      saveDraft(id, { fillBlanks: [...fillBlanks.value] })
+    } else if (t === 'proof') {
+      saveDraft(id, {
+        proofText: proofText.value,
+        proofImages: [...proofImages.value],
+      })
+    }
+  }, 400)
+}
+
+function onClearDraft() {
+  if (!problem.value) return
+  clearDraft(problem.value.id)
+
+  const t = problem.value.type
+  if (t === 'algorithm') {
+    submitPanel.code = ''
+  } else if (t === 'choice') {
+    choiceSelected.value = ''
+  } else if (t === 'fill_blank') {
+    const total = Array.isArray(problem.value.blanks) ? problem.value.blanks.length : 0
+    fillBlanks.value = new Array(total).fill('')
+  } else if (t === 'proof') {
+    proofText.value = ''
+    proofImages.value = []
+  }
+}
+
+// 监听所有输入变化，debounce 保存草稿
+watch(
+  [
+    () => submitPanel.language,
+    () => submitPanel.code,
+    choiceSelected,
+    fillBlanks,
+    proofText,
+    proofImages,
+  ],
+  scheduleDraftSave,
+  { deep: true }
+)
+
+// 组件卸载时立即保存一次
+onUnmounted(() => {
+  if (draftTimer) {
+    window.clearTimeout(draftTimer)
+    draftTimer = null
+  }
+  if (problem.value) {
+    const id = problem.value.id
+    const t = problem.value.type
+    if (t === 'algorithm') {
+      saveDraft(id, { language: submitPanel.language, code: submitPanel.code })
+    } else if (t === 'choice') {
+      saveDraft(id, { choiceSelected: choiceSelected.value })
+    } else if (t === 'fill_blank') {
+      saveDraft(id, { fillBlanks: [...fillBlanks.value] })
+    } else if (t === 'proof') {
+      saveDraft(id, {
+        proofText: proofText.value,
+        proofImages: [...proofImages.value],
+      })
+    }
+  }
+  if (wsHandle.value) {
+    wsHandle.value.close()
+    wsHandle.value = null
+  }
+})
+
 // ===== 算法题提交 =====
 async function onSubmit() {
   submitError.value = ''
@@ -486,6 +805,7 @@ async function onSubmit() {
     currentSubmission.value = sub
     openWS(sub.id)
     loadMySubmissions()
+    // 提交后保留输入内容，方便对照答案
   } catch (e: any) {
     const status = e?.response?.status
     if (status === 401) {
@@ -521,8 +841,112 @@ async function onSubmitChoice() {
     })
 
     currentSubmission.value = sub
-    // 同步判题，返回时已是终态，不打开 WebSocket
     loadMySubmissions()
+    // 提交后保留选择，方便对照答案
+  } catch (e: any) {
+    const status = e?.response?.status
+    if (status === 401) {
+      submitError.value = '登录已过期，请重新登录'
+    } else {
+      submitError.value = e?.response?.data?.detail || '提交失败，请稍后重试'
+    }
+  } finally {
+    submitting.value = false
+  }
+}
+
+// ===== 填空题提交（同步判题） =====
+async function onSubmitFillBlank() {
+  submitError.value = ''
+
+  if (!userStore.isLoggedIn) {
+    submitError.value = '请先登录'
+    return
+  }
+  if (!hasAnyBlankFilled.value) {
+    submitError.value = '请至少填写一个空'
+    return
+  }
+
+  submitting.value = true
+
+  try {
+    const sub = await submitCode({
+      problem_id: problemId.value,
+      language: 'fill_blank',
+      answer_data: { blanks: fillBlanks.value.map((s) => (s ?? '').trim()) },
+    })
+
+    currentSubmission.value = sub
+    loadMySubmissions()
+    // 提交后保留填空内容，方便对照答案
+  } catch (e: any) {
+    const status = e?.response?.status
+    if (status === 401) {
+      submitError.value = '登录已过期，请重新登录'
+    } else {
+      submitError.value = e?.response?.data?.detail || '提交失败，请稍后重试'
+    }
+  } finally {
+    submitting.value = false
+  }
+}
+
+// ===== 证明题提交（不判题） =====
+async function handleProofImageSelect(event: Event) {
+  const input = event.target as HTMLInputElement
+  if (!input.files || input.files.length === 0) return
+
+  proofUploading.value = true
+  try {
+    for (const file of Array.from(input.files)) {
+      if (file.size > 5 * 1024 * 1024) {
+        submitError.value = `图片 ${file.name} 超过 5MB`
+        continue
+      }
+      const res = await uploadUserImage(file)
+      proofImages.value.push({ id: res.id, url: res.url })
+    }
+    submitError.value = ''
+  } catch (e: any) {
+    submitError.value = e?.response?.data?.detail || '图片上传失败'
+  } finally {
+    proofUploading.value = false
+    input.value = ''
+  }
+}
+
+function removeProofImage(id: number) {
+  proofImages.value = proofImages.value.filter((img) => img.id !== id)
+}
+
+async function onSubmitProof() {
+  submitError.value = ''
+
+  if (!userStore.isLoggedIn) {
+    submitError.value = '请先登录'
+    return
+  }
+  if (!canSubmitProof.value) {
+    submitError.value = '请填写证明过程或上传图片'
+    return
+  }
+
+  submitting.value = true
+
+  try {
+    const sub = await submitCode({
+      problem_id: problemId.value,
+      language: 'proof',
+      answer_data: {
+        text: proofText.value.trim(),
+        images: proofImages.value.map((img) => img.id),
+      },
+    })
+
+    currentSubmission.value = sub
+    loadMySubmissions()
+    // 提交后保留证明内容和图片，方便对照答案
   } catch (e: any) {
     const status = e?.response?.status
     if (status === 401) {
@@ -579,13 +1003,6 @@ function openWS(submissionId: number) {
 onMounted(() => {
   loadProblem()
   loadMySubmissions()
-})
-
-onUnmounted(() => {
-  if (wsHandle.value) {
-    wsHandle.value.close()
-    wsHandle.value = null
-  }
 })
 </script>
 
@@ -653,6 +1070,29 @@ onUnmounted(() => {
   font-size: var(--font-size-small);
   font-weight: var(--font-weight-bold);
   color: var(--color-text-primary);
+}
+
+.panel-header-with-action {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.clear-draft-btn {
+  padding: 2px 10px;
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.clear-draft-btn:hover {
+  border-color: var(--color-danger-text);
+  color: var(--color-danger-text);
 }
 
 /* ===== 题目卡片 ===== */
@@ -730,7 +1170,6 @@ onUnmounted(() => {
   margin: 0;
 }
 
-/* 选项（题目描述中展示） */
 .options {
   display: flex;
   flex-direction: column;
@@ -750,7 +1189,6 @@ onUnmounted(() => {
   color: var(--color-primary);
 }
 
-/* 填空 */
 .blanks {
   display: flex;
   flex-direction: column;
@@ -768,7 +1206,6 @@ onUnmounted(() => {
   font-size: var(--font-size-small);
 }
 
-/* 样例 */
 .sample-card {
   background: var(--color-sample-bg);
   border: 1px solid var(--color-sample-code-border);
@@ -813,7 +1250,6 @@ onUnmounted(() => {
   line-height: 1.7;
 }
 
-/* 子项目 */
 .subproject {
   margin-bottom: var(--spacing-md);
   padding-left: var(--spacing-md);
@@ -829,7 +1265,6 @@ onUnmounted(() => {
   border-radius: var(--radius-md);
 }
 
-/* 答案 */
 .answer-box {
   padding: var(--spacing-md);
   background: var(--color-sample-bg);
@@ -1122,6 +1557,7 @@ onUnmounted(() => {
 .status-MLE { background: var(--color-warning-bg); color: var(--color-warning-text); }
 .status-RE { background: var(--color-danger-bg); color: var(--color-danger-text); }
 .status-CE { background: var(--color-danger-bg); color: var(--color-danger-text); }
+.status-SUBMITTED { background: var(--color-primary-light); color: var(--color-primary); }
 
 .error-message {
   margin-top: 8px;
@@ -1232,5 +1668,161 @@ onUnmounted(() => {
   font-size: var(--font-size-body);
   line-height: 1.5;
   word-break: break-word;
+}
+
+/* ===== 填空题输入 ===== */
+.blank-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin: var(--spacing-md);
+}
+
+.blank-input-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.blank-input-label {
+  font-size: var(--font-size-small);
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.blank-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-body);
+  font-family: var(--font-family-mono);
+  background: var(--color-bg-card);
+  color: var(--color-text-primary);
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+
+.blank-input:focus {
+  border-color: var(--color-primary);
+}
+
+/* ===== 证明题 ===== */
+.proof-form {
+  padding: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.proof-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.proof-form .form-label {
+  font-size: var(--font-size-small);
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.proof-textarea-wrapper {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-card);
+  resize: both;
+  overflow: auto;
+  width: 100%;
+  min-width: 200px;
+  max-width: 100%;
+  min-height: 140px;
+  max-height: 600px;
+  height: 200px;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+
+.proof-textarea-wrapper:focus-within {
+  border-color: var(--color-primary);
+}
+
+.proof-textarea {
+  width: 100%;
+  height: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-body);
+  font-family: inherit;
+  background: transparent;
+  color: var(--color-text-primary);
+  box-sizing: border-box;
+  outline: none;
+  resize: none;
+  display: block;
+}
+
+.proof-file-input {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.proof-uploading {
+  font-size: 12px;
+  color: var(--color-primary);
+  margin: 4px 0 0;
+}
+
+.proof-image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: var(--spacing-sm);
+}
+
+.proof-image-item {
+  position: relative;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-sample-bg);
+  aspect-ratio: 1 / 1;
+}
+
+.proof-image-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.proof-image-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.proof-image-remove:hover {
+  background: rgba(0, 0, 0, 0.85);
+}
+
+.proof-hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  line-height: 1.5;
 }
 </style>
