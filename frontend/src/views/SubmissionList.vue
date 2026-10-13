@@ -17,6 +17,7 @@
             <option value="MLE">内存超限</option>
             <option value="RE">运行错误</option>
             <option value="CE">编译错误</option>
+            <option value="SUBMITTED">已提交</option>
           </select>
         </div>
       </header>
@@ -125,6 +126,7 @@ function statusLabel(status: string): string {
     MLE: '内存超限',
     RE: '运行错误',
     CE: '编译错误',
+    SUBMITTED: '已提交',
   }
   return map[status] || status
 }
@@ -132,6 +134,7 @@ function statusLabel(status: string): string {
 function languageLabel(lang: string): string {
   if (lang === 'choice') return '选择题'
   if (lang === 'fill_blank') return '填空题'
+  if (lang === 'proof') return '证明题'
   if (lang === 'python') return 'Python'
   if (lang === 'java') return 'Java'
   if (lang === 'cpp') return 'C++'
@@ -351,6 +354,7 @@ onMounted(load)
 .status-MLE { background: var(--color-warning-bg); color: var(--color-warning-text); }
 .status-RE { background: var(--color-danger-bg); color: var(--color-danger-text); }
 .status-CE { background: var(--color-danger-bg); color: var(--color-danger-text); }
+.status-SUBMITTED { background: var(--color-primary-light); color: var(--color-primary); }
 
 /* ===== 分页 ===== */
 .pagination {
