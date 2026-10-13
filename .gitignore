@@ -29,3 +29,4 @@ frontend/android/capacitor-cordova-android-plugins/
 frontend/android/app/src/main/assets/public/
 frontend/android/app/src/main/assets/capacitor.config.json
 frontend/android/app/src/main/assets/capacitor.plugins.json
+backend/uploads/
