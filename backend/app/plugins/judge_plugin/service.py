@@ -5,15 +5,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.submission import Submission
 from app.schemas.submission import SubmissionCreate
-
+from app.plugins.judge_plugin.judge_fill_blank import judge_fill_blank
 
 def _infer_submission_kind(language: str) -> str:
     if language == "choice":
         return "choice"
     if language == "fill_blank":
         return "fill_blank"
+    if language == "proof":
+        return "proof"
     return "code"
-
 
 async def create_submission(
     db: AsyncSession,
@@ -52,16 +53,18 @@ async def judge_inline(db: AsyncSession, sub: Submission) -> None:
         await db.commit()
         await db.refresh(sub)
         return
-
+    
     if sub.submission_kind == "choice":
         verdict = judge_choice(sub.answer_data, problem.options)
     elif sub.submission_kind == "fill_blank":
+        verdict = judge_fill_blank(sub.answer_data, problem.blanks)
+    elif sub.submission_kind == "proof":
         verdict = {
-            "status": "RE",
+            "status": "SUBMITTED",
             "passed_cases": 0,
             "total_cases": 0,
             "runtime_ms": 0,
-            "error_message": "fill_blank judge not implemented yet",
+            "error_message": None,
         }
     else:
         return
