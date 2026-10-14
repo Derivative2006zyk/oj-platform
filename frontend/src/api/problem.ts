@@ -38,6 +38,8 @@ export async function getProblems(params: {
   type?: string
   tag?: string
   keyword?: string
+  bank_id?: number
+  unassigned?: boolean
 }): Promise<ProblemListResponse> {
   const res = await api.get('/problems', { params })
   return res.data
