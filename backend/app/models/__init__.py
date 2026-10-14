@@ -6,6 +6,7 @@ from app.models.test_case import TestCase
 from app.models.plugin_config import PluginConfig
 from app.models.user import User
 from app.models.submission import Submission
+from app.models.bank import Bank
 
 __all__ = [
     "Category",
@@ -16,4 +17,5 @@ __all__ = [
     "PluginConfig",
     "User",
     "Submission",
+    "Bank",
 ]
