@@ -25,6 +25,8 @@ async def get_problem_list(
     type: str = None,
     tag: str = None,
     keyword: str = None,
+    bank_id: int = None,
+    unassigned: bool = False,
 ):
     """Get problem list with filters and pagination."""
     query = select(Problem)
@@ -38,6 +40,10 @@ async def get_problem_list(
         query = query.where(Problem.tags.contains([tag]))
     if keyword:
         query = query.where(Problem.title.ilike(f"%{keyword}%"))
+    if bank_id is not None:
+        query = query.where(Problem.bank_id == bank_id)
+    if unassigned:
+        query = query.where(Problem.bank_id.is_(None))
 
     count_query = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_query)).scalar()
@@ -57,7 +63,6 @@ async def get_problem_list(
         "items": problems,
     }
 
-
 async def get_problem_detail(db: AsyncSession, problem_id: int):
     """Get problem detail, with type-specific extra data."""
     problem = await db.get(Problem, problem_id)
@@ -72,6 +77,7 @@ async def get_problem_detail(db: AsyncSession, problem_id: int):
         "difficulty": problem.difficulty,
         "tags": problem.tags,
         "category_id": problem.category_id,
+        "bank_id": problem.bank_id,   # 新增
         "explanation": problem.explanation,
         "options": problem.options,
         "blanks": problem.blanks,
@@ -127,6 +133,7 @@ async def create_problem(db: AsyncSession, data: ProblemCreate):
     problem = Problem(
         title=data.title,
         category_id=data.category_id,
+        bank_id=data.bank_id,
         description=data.description,
         type=data.type,
         difficulty=data.difficulty,

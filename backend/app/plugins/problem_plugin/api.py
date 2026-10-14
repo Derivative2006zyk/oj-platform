@@ -26,16 +26,19 @@ async def get_categories(db: AsyncSession = Depends(get_db)):
 @router.get("/problems")
 async def list_problems(
     page: int = Query(1, ge=1),
-    page_size: int = Query(10, ge=1, le=50),
+    page_size: int = Query(10, ge=1, le=200),
     category_id: int = Query(None),
     difficulty: int = Query(None, ge=1, le=5),
     type: str = Query(None),
     tag: str = Query(None),
     keyword: str = Query(None),
+    bank_id: int = Query(None),
+    unassigned: bool = Query(False),
     db: AsyncSession = Depends(get_db),
 ):
     return await service.get_problem_list(
-        db, page, page_size, category_id, difficulty, type, tag, keyword
+        db, page, page_size, category_id, difficulty, type, tag, keyword,
+        bank_id=bank_id, unassigned=unassigned,
     )
 
 @router.get("/problems/{problem_id}")
