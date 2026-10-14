@@ -30,6 +30,17 @@
     </div>
 
     <div class="form-group">
+      <label>所属题库（可选）</label>
+      <select v-model.number="form.bank_id">
+        <option :value="null">不归属任何题库</option>
+        <option v-for="b in banks" :key="b.id" :value="b.id">
+          {{ b.name }}（{{ b.problem_count }} 题）
+        </option>
+      </select>
+      <small class="hint">题库可在题库列表页按组查看和筛选</small>
+    </div>
+
+    <div class="form-group">
       <label>题型</label>
       <select v-model="form.type" :disabled="isEdit">
         <option value="algorithm">算法题</option>
@@ -180,6 +191,7 @@ import {
   uploadImage,
   type Category
 } from '../api/problem'
+import { listBanks, type Bank } from '../api/bank'
 
 const route = useRoute()
 const router = useRouter()
@@ -188,6 +200,7 @@ const isEdit = computed(() => route.params.id !== undefined && route.params.id !
 
 const adminKey = ref(localStorage.getItem('admin_key') || 'admin-key-change-me')
 const categories = ref<Category[]>([])
+const banks = ref<Bank[]>([])
 const tagsInput = ref('')
 const submitting = ref(false)
 const uploadingImage = ref(false)
@@ -195,6 +208,7 @@ const uploadingImage = ref(false)
 const form = reactive({
   title: '',
   category_id: 1,
+  bank_id: null as number | null,
   type: 'algorithm',
   difficulty: 1,
   description: '',
@@ -286,6 +300,7 @@ function buildSubmitData() {
   const base: any = {
     title: form.title.trim(),
     category_id: form.category_id,
+    bank_id: form.bank_id,
     type: form.type,
     difficulty: form.difficulty,
     description: form.description,
@@ -402,7 +417,9 @@ function cancel() {
 // ===================== 初始化 =====================
 onMounted(async () => {
   try {
-    categories.value = await getCategories()
+    const [cats, bs] = await Promise.all([getCategories(), listBanks()])
+    categories.value = Array.isArray(cats) ? cats : []
+    banks.value = Array.isArray(bs) ? bs : []
   } catch (e) {
     alert('无法连接到服务器，请确认后端已启动')
     return
@@ -421,6 +438,7 @@ onMounted(async () => {
     const detail = await getProblemDetail(id)
     form.title = detail.title || ''
     form.category_id = detail.category_id || 1
+    form.bank_id = (detail as any).bank_id ?? null
     form.type = detail.type || 'algorithm'
     form.difficulty = detail.difficulty || 1
     form.description = detail.description || ''
