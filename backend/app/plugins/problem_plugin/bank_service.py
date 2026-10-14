@@ -75,19 +75,30 @@ def _file_hash(path: Path) -> str:
 
 
 def _resolve_image_path(file_path: str, upload_dir: Path) -> Optional[Path]:
-    """将 image.file_path 解析为实际存在的文件路径。"""
+    """将 image.file_path 解析为实际存在的文件路径。
+
+    目录按 uploads/{年}/{月}/ 组织，因此优先递归查找同名文件。
+    """
     p = Path(file_path)
+    name = p.name
 
-    candidates = []
+    # 1. 绝对路径直接尝试
     if p.is_absolute():
-        candidates.append(p)
-    else:
-        candidates.append(upload_dir / p)
-        candidates.append(upload_dir / p.name)
+        try:
+            if p.exists() and p.is_file():
+                return p
+        except Exception:
+            pass
 
-    # 图片按 /app/uploads/... 挂载时的常见路径
-    candidates.append(upload_dir / "images" / p.name)
-    candidates.append(upload_dir / p.name)
+    # 2. upload_dir 下常见位置
+    candidates = [
+        upload_dir / name,
+        upload_dir / "images" / name,
+        upload_dir / "submissions" / name,
+        upload_dir / "bank" / name,
+    ]
+    if not p.is_absolute():
+        candidates.insert(0, upload_dir / p)
 
     for c in candidates:
         try:
@@ -96,8 +107,15 @@ def _resolve_image_path(file_path: str, upload_dir: Path) -> Optional[Path]:
         except Exception:
             continue
 
-    return None
+    # 3. 兜底：递归查找（覆盖 uploads/{年}/{月}/ 结构）
+    try:
+        for found in upload_dir.rglob(name):
+            if found.is_file():
+                return found
+    except Exception:
+        pass
 
+    return None
 
 async def export_bank(
     db: AsyncSession,
