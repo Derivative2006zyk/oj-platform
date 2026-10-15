@@ -72,9 +72,16 @@
         <button
           class="btn-ghost"
           :disabled="exporting"
-          @click="onExportAll"
+          @click="onExport"
         >
-          {{ exporting ? '导出中...' : '导出题库' }}
+          {{ exporting ? '导出中...' : (selectedBank !== null ? '导出该题库' : '导出全部') }}
+        </button>
+        <button
+          class="btn-ghost"
+          :disabled="importing"
+          @click="onOpenImport"
+        >
+          导入题库
         </button>
         <button
           :class="['btn-ghost', { active: groupedView }]"
@@ -175,11 +182,87 @@
         </div>
       </div>
     </template>
+
+    <!-- 导入对话框 -->
+    <div v-if="importDialog.visible" class="modal-mask" @click.self="onCloseImport">
+      <div class="modal">
+        <header class="modal-header">
+          <h2>导入题库</h2>
+          <button class="modal-close" @click="onCloseImport">×</button>
+        </header>
+
+        <div class="modal-body">
+          <div class="form-item">
+            <label>题库 ZIP 文件</label>
+            <input
+              type="file"
+              accept=".zip,application/zip"
+              @change="onImportFileSelect"
+            />
+          </div>
+
+          <div class="form-item">
+            <label>同名题目处理</label>
+            <select v-model="importDialog.strategy">
+              <option value="skip">跳过（保留已有）</option>
+              <option value="rename">重命名（加后缀）</option>
+              <option value="overwrite">覆盖（删除已有）</option>
+            </select>
+          </div>
+
+          <div v-if="importDialog.error" class="error">
+            {{ importDialog.error }}
+          </div>
+
+          <div v-if="importDialog.result" class="import-result">
+            <div class="result-row">
+              <span>总数</span>
+              <span>{{ importDialog.result.total }}</span>
+            </div>
+            <div class="result-row">
+              <span>导入</span>
+              <span>{{ importDialog.result.imported }}</span>
+            </div>
+            <div class="result-row">
+              <span>跳过</span>
+              <span>{{ importDialog.result.skipped }}</span>
+            </div>
+            <div class="result-row">
+              <span>失败</span>
+              <span>{{ importDialog.result.failed }}</span>
+            </div>
+            <div
+              v-if="importDialog.result.errors && importDialog.result.errors.length"
+              class="import-errors"
+            >
+              <div
+                v-for="(err, i) in importDialog.result.errors"
+                :key="i"
+                class="import-error-item"
+              >
+                {{ err }}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <footer class="modal-footer">
+          <button class="btn-ghost" @click="onCloseImport">关闭</button>
+          <button
+            class="btn-primary"
+            :disabled="!importDialog.file || importing"
+            @click="onImportSubmit"
+          >
+            {{ importing ? '导入中...' : '开始导入' }}
+          </button>
+        </footer>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import {
   getProblems,
@@ -188,7 +271,13 @@ import {
   type ProblemSummary,
   type Category
 } from '../api/problem'
-import { exportBank, listBanks, type Bank } from '../api/bank'
+import {
+  exportBank,
+  listBanks,
+  importBank,
+  type Bank,
+  type ImportResult,
+} from '../api/bank'
 
 const router = useRouter()
 const route = useRoute()
@@ -221,6 +310,16 @@ const selectedCategory = ref<number | null>(
 
 // 导出
 const exporting = ref(false)
+
+// 导入状态
+const importing = ref(false)
+const importDialog = reactive({
+  visible: false,
+  file: null as File | null,
+  strategy: 'skip' as 'skip' | 'rename' | 'overwrite',
+  error: '',
+  result: null as ImportResult | null,
+})
 
 // 分组视图
 const groupedView = ref(false)
@@ -336,23 +435,72 @@ function goCreate() {
 }
 
 // ===== 导出 =====
-async function onExportAll() {
+async function onExport() {
   if (exporting.value) return
   exporting.value = true
   try {
-    const ids: number[] | null = selectedBank.value !== null
-      ? null  // 全量或按需扩展
-      : null
-    await exportBank({ problem_ids: ids })
+    const options: any = {}
+    if (selectedBank.value !== null) {
+      options.bank_id = selectedBank.value
+    }
+    await exportBank(options)
   } catch (e: any) {
     const status = e?.response?.status
     if (status === 401 || status === 403) {
       alert('需要管理员密钥，请先在题目编辑页填写后重试')
     } else {
-      alert(e?.response?.data?.detail || '导出失败')
+      const detail = e?.response?.data?.detail
+      alert(detail || '导出失败')
     }
   } finally {
     exporting.value = false
+  }
+}
+
+// ===== 导入 =====
+function onOpenImport() {
+  importDialog.visible = true
+  importDialog.file = null
+  importDialog.error = ''
+  importDialog.result = null
+  importDialog.strategy = 'skip'
+}
+
+function onCloseImport() {
+  importDialog.visible = false
+}
+
+function onImportFileSelect(event: Event) {
+  const input = event.target as HTMLInputElement
+  if (!input.files || input.files.length === 0) {
+    importDialog.file = null
+    return
+  }
+  importDialog.file = input.files[0]
+}
+
+async function onImportSubmit() {
+  if (!importDialog.file) return
+  importing.value = true
+  importDialog.error = ''
+  importDialog.result = null
+  try {
+    const result = await importBank(importDialog.file, importDialog.strategy)
+    importDialog.result = result
+
+    await Promise.all([loadBanks(), loadProblems()])
+    if (groupedView.value) {
+      await loadGrouped()
+    }
+  } catch (e: any) {
+    const status = e?.response?.status
+    if (status === 401 || status === 403) {
+      importDialog.error = '需要管理员密钥，请先在题目编辑页填写后重试'
+    } else {
+      importDialog.error = e?.response?.data?.detail || '导入失败'
+    }
+  } finally {
+    importing.value = false
   }
 }
 
@@ -367,7 +515,6 @@ async function toggleGroupedView() {
 async function loadGrouped() {
   groupLoading.value = true
   try {
-    // 一次拉取全部匹配题目
     const data = await getProblems({
       page: 1,
       page_size: 200,
@@ -375,7 +522,6 @@ async function loadGrouped() {
     })
     const items: ProblemSummary[] = Array.isArray(data?.items) ? data.items : []
 
-    // 按 bank_id 分组
     const map = new Map<string, { key: string; title: string; items: ProblemSummary[] }>()
     const banksById = new Map(banks.value.map(b => [b.id, b]))
 
@@ -393,7 +539,6 @@ async function loadGrouped() {
       map.get(key)!.items.push(p)
     }
 
-    // 排序：已归属题库按 sort_order，未归属放最后
     const groups = Array.from(map.values())
     groups.sort((a, b) => {
       if (a.key === '__unassigned__') return 1
@@ -407,7 +552,6 @@ async function loadGrouped() {
 
     groupedProblems.value = groups
 
-    // 默认全部展开
     const nextOpen: Record<string, boolean> = { ...openGroups.value }
     for (const g of groups) {
       if (nextOpen[g.key] === undefined) nextOpen[g.key] = true
@@ -455,7 +599,6 @@ onUnmounted(() => {
 
 // ===== 初始化 =====
 onMounted(async () => {
-  // 从 URL 恢复题库筛选
   if (route.query.bank_id) {
     selectedBank.value = Number(route.query.bank_id)
   } else if (route.query.unassigned === '1') {
@@ -656,6 +799,11 @@ onMounted(async () => {
   background: var(--color-primary-hover);
 }
 
+.btn-primary:disabled {
+  background: var(--color-primary-disabled);
+  cursor: not-allowed;
+}
+
 .btn-ghost {
   padding: 8px 20px;
   background: transparent;
@@ -807,7 +955,6 @@ onMounted(async () => {
   padding: var(--spacing-md) var(--spacing-lg);
   cursor: pointer;
   user-select: none;
-  border-bottom: 1px solid transparent;
   transition: background 0.15s;
 }
 
@@ -865,6 +1012,155 @@ onMounted(async () => {
   box-shadow: none;
 }
 
+/* ===== 导入对话框 ===== */
+.modal-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: var(--spacing-lg);
+}
+
+.modal {
+  background: var(--color-bg-card);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  width: 100%;
+  max-width: 500px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+
+.modal-close {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-close:hover {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.modal-body {
+  padding: var(--spacing-lg);
+  overflow-y: auto;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-top: 1px solid var(--color-border-light);
+}
+
+.form-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: var(--spacing-md);
+}
+
+.form-item label {
+  font-size: var(--font-size-small);
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.form-item input[type="file"],
+.form-item select {
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-body);
+  background: var(--color-bg-card);
+  color: var(--color-text-primary);
+  outline: none;
+}
+
+.error {
+  margin-bottom: var(--spacing-md);
+  padding: 10px 14px;
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
+  font-size: 13px;
+  border-radius: var(--radius-md);
+}
+
+.import-result {
+  margin-top: var(--spacing-md);
+  padding: var(--spacing-md);
+  background: var(--color-sample-bg);
+  border-radius: var(--radius-md);
+}
+
+.result-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--font-size-body);
+  margin-bottom: 6px;
+}
+
+.result-row:last-child {
+  margin-bottom: 0;
+}
+
+.result-row span:first-child {
+  color: var(--color-text-secondary);
+}
+
+.result-row span:last-child {
+  font-family: var(--font-family-mono);
+  font-weight: 500;
+}
+
+.import-errors {
+  margin-top: var(--spacing-sm);
+  max-height: 120px;
+  overflow-y: auto;
+  padding: 8px 12px;
+  background: var(--color-danger-bg);
+  border-radius: var(--radius-sm);
+}
+
+.import-error-item {
+  font-size: 12px;
+  color: var(--color-danger-text);
+  font-family: var(--font-family-mono);
+  margin-bottom: 4px;
+  word-break: break-all;
+}
+
 /* ===== 响应式 ===== */
 @media (max-width: 600px) {
   .problem-list {
@@ -897,6 +1193,10 @@ onMounted(async () => {
   }
 
   .group-header {
+    padding: var(--spacing-md);
+  }
+
+  .modal-mask {
     padding: var(--spacing-md);
   }
 }
