@@ -120,6 +120,7 @@ def _resolve_image_path(file_path: str, upload_dir: Path) -> Optional[Path]:
 async def export_bank(
     db: AsyncSession,
     problem_ids: Optional[List[int]] = None,
+    bank_id: Optional[int] = None,
 ) -> bytes:
     """导出题库为 ZIP 字节流。
 
@@ -133,6 +134,8 @@ async def export_bank(
     q = select(Problem)
     if problem_ids:
         q = q.where(Problem.id.in_(problem_ids))
+    elif bank_id is not None:
+        q = q.where(Problem.bank_id == bank_id)
     q = q.order_by(Problem.id)
     problems = list((await db.execute(q)).scalars().all())
 
@@ -197,6 +200,9 @@ async def export_bank(
     # 6. 组装分类
     cat_res = await db.execute(select(Category).order_by(Category.sort_order))
     all_cats = {c.id: c for c in cat_res.scalars().all()}
+    from app.models.bank import Bank
+    bank_res = await db.execute(select(Bank))
+    all_banks = {b.id: b for b in bank_res.scalars().all()}
 
     used_cat_ids = {p.category_id for p in problems}
     categories_payload = []
@@ -215,9 +221,13 @@ async def export_bank(
         cat = all_cats.get(p.category_id)
         cat_name = cat.name if cat else ""
 
+        bank = all_banks.get(p.bank_id) if p.bank_id else None
+        bank_name = bank.name if bank else ""
+
         payload = {
             "title": p.title,
             "category_name": cat_name,
+            "bank_name": bank_name,
             "type": p.type,
             "difficulty": p.difficulty,
             "tags": p.tags or [],
@@ -250,6 +260,17 @@ async def export_bank(
         problems_payload.append(payload)
 
     # 8. manifest
+    used_bank_ids = {p.bank_id for p in problems if p.bank_id}
+    banks_payload = []
+    for bid in sorted(used_bank_ids):
+        b = all_banks.get(bid)
+        if b:
+            banks_payload.append({
+                "name": b.name,
+                "description": b.description,
+                "sort_order": b.sort_order,
+            })
+
     manifest = {
         "format": FORMAT_NAME,
         "format_version": FORMAT_VERSION,
@@ -258,6 +279,7 @@ async def export_bank(
         "problem_count": len(problems_payload),
         "image_count": len(image_files),
         "categories": categories_payload,
+        "banks": banks_payload,
         "problems": problems_payload,
     }
 
