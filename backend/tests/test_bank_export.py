@@ -91,3 +91,53 @@ async def test_export_empty(client):
         json={"problem_ids": [999999]},
     )
     assert res.status_code == 400
+
+@pytest.mark.asyncio
+async def test_export_by_bank(client):
+    bres = await client.post(
+        "/api/admin/banks",
+        headers={"X-Admin-Key": "admin-key-change-me"},
+        json={"name": "导出专用题库", "sort_order": 1},
+    )
+    assert bres.status_code == 201
+    bid = bres.json()["id"]
+
+    for i in range(2):
+        await client.post(
+            "/api/admin/problems",
+            headers={"X-Admin-Key": "admin-key-change-me"},
+            json={
+                "title": f"题库内 {i}",
+                "category_id": 1,
+                "bank_id": bid,
+                "description": "x",
+                "type": "algorithm",
+                "difficulty": 1,
+            },
+        )
+    await client.post(
+        "/api/admin/problems",
+        headers={"X-Admin-Key": "admin-key-change-me"},
+        json={
+            "title": "题库外",
+            "category_id": 1,
+            "description": "x",
+            "type": "algorithm",
+            "difficulty": 1,
+        },
+    )
+
+    res = await client.post(
+        "/api/admin/bank/export",
+        headers={"X-Admin-Key": "admin-key-change-me"},
+        json={"bank_id": bid},
+    )
+    assert res.status_code == 200
+
+    zf = zipfile.ZipFile(io.BytesIO(res.content))
+    manifest = json.loads(zf.read("manifest.json"))
+    titles = [p["title"] for p in manifest["problems"]]
+    assert "题库内 0" in titles
+    assert "题库内 1" in titles
+    assert "题库外" not in titles
+    assert any(p.get("bank_name") == "导出专用题库" for p in manifest["problems"])
