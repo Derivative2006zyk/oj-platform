@@ -203,14 +203,15 @@ fn update_tray_tooltip(app: AppHandle, text: String) -> Result<(), String> {
 /// 前端传 token，后端拉一次 widget summary，更新 tooltip。
 #[tauri::command]
 fn refresh_tray_from_backend(app: AppHandle, token: String) -> Result<(), String> {
-    // 1. 拉数据
+    // 1. 拉数据（禁用系统代理，避免 Clash 等软件拦截本机请求）
     let client = reqwest::blocking::Client::builder()
         .timeout(std::time::Duration::from_secs(5))
+        .no_proxy()
         .build()
         .map_err(|e| format!("http client: {}", e))?;
 
     let resp = client
-        .get("http://localhost:8000/api/widget/summary")
+        .get("http://127.0.0.1:8000/api/widget/summary")
         .bearer_auth(&token)
         .send()
         .map_err(|e| format!("request failed: {}", e))?;
