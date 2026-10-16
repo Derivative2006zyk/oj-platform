@@ -18,16 +18,12 @@ export function openSubmissionWS(
   onError?: (e: Event) => void
 ): SubmissionWSHandle {
   const token = localStorage.getItem('oj_token') || ''
-
-  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
-  const url = `${proto}//${location.host}/api/submissions/${submissionId}/ws?token=${encodeURIComponent(token)}`
-
+  const url = `ws://127.0.0.1:8000/api/submissions/${submissionId}/ws?token=${encodeURIComponent(token)}`
   const ws = new WebSocket(url)
 
   ws.onmessage = (e) => {
     try {
-      const data = JSON.parse(e.data) as WSMessage
-      onMessage(data)
+      onMessage(JSON.parse(e.data) as WSMessage)
     } catch (err) {
       console.warn('WS message parse error', err)
     }
@@ -39,9 +35,7 @@ export function openSubmissionWS(
 
   return {
     close: () => {
-      try {
-        ws.close()
-      } catch {}
+      try { ws.close() } catch {}
     },
     isOpen: () => ws.readyState === WebSocket.OPEN,
   }
