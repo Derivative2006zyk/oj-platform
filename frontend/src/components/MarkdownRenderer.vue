@@ -8,18 +8,17 @@ import { marked } from '../utils/marked'
 
 const props = defineProps<{ content: string }>()
 
-// 后端地址（开发环境）
-const BACKEND_URL = 'http://localhost:8000'
+// 后端地址：统一用 127.0.0.1，避免 Windows IPv6 解析问题
+const BACKEND_URL = 'http://127.0.0.1:8000'
 
 const rendered = computed(() => {
   if (!props.content) return ''
   let content = String(props.content)
 
-  // 1. 兼容旧格式：单数 /api/image/ → 复数 /api/images/
+  // 1. 兼容旧格式：/api/image/ → /api/images/
   content = content.replace(/\/api\/image\//g, '/api/images/')
 
-  // 2. 把 Markdown 图片中的相对路径 /api/... 替换为后端绝对地址
-  //    匹配 ![alt](/api/xxx) 形式
+  // 2. 把 ![alt](/api/xxx) 替换为绝对地址
   content = content.replace(
     /!\[([^\]]*)\]\(\/api\//g,
     `![$1](${BACKEND_URL}/api/`
