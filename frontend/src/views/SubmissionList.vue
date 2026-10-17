@@ -142,9 +142,17 @@ function languageLabel(lang: string): string {
 }
 
 function formatTime(s: string): string {
+  if (!s) return '-'
   try {
-    const d = new Date(s)
+    // 如果后端返回的时间没有带 'Z'（UTC 标识），手动补上，让浏览器按 UTC 解析并转换为本地时间
+    let timeStr = s
+    if (!timeStr.endsWith('Z') && !timeStr.includes('+')) {
+      // 把空格换成 T，并补上 Z
+      timeStr = timeStr.replace(' ', 'T') + 'Z'
+    }
+    const d = new Date(timeStr)
     if (isNaN(d.getTime())) return s
+    
     const pad = (n: number) => String(n).padStart(2, '0')
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
   } catch {
