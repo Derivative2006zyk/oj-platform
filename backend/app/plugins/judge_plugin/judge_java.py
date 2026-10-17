@@ -1,9 +1,6 @@
-# backend/app/plugins/judge_plugin/judge_java.py
-
-import shutil
-import tempfile
 from pathlib import Path
 from typing import List, Optional
+from app.plugins.judge_plugin.sandbox import sandbox_workspace
 
 from app.plugins.judge_plugin.sandbox import (
     run_java_compiled,
@@ -35,8 +32,8 @@ def judge_java(
             "error_message": None,
         }
 
-    tmpdir = Path(tempfile.mkdtemp(prefix="oj_java_"))
-    try:
+    # 使用 sandbox_workspace 替代 tempfile.mkdtemp
+    with sandbox_workspace() as tmpdir:
         code_file = tmpdir / "Main.java"
         code_file.write_text(code, encoding="utf-8")
 
@@ -114,6 +111,3 @@ def judge_java(
             "runtime_ms": max_runtime,
             "error_message": first_error,
         }
-
-    finally:
-        shutil.rmtree(tmpdir, ignore_errors=True)

@@ -23,11 +23,15 @@ COPY . .
 # 创建上传目录
 RUN mkdir -p /app/uploads
 
+# 从官方镜像拷贝 docker CLI，worker 判题调用沙箱时使用
+COPY --from=docker:27-cli /usr/local/bin/docker /usr/local/bin/docker
+
 # 暴露端口
 EXPOSE 8000
 
 # 让 entrypoint.sh 可执行
 RUN chmod +x /app/entrypoint.sh
 
-# 启动：先跑迁移，再启动 uvicorn
+# 启动：先跑迁移，再执行 CMD（默认为启动后端 API）
 ENTRYPOINT ["/app/entrypoint.sh"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
