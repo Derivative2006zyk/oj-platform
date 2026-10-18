@@ -1,6 +1,6 @@
 from typing import Optional
 
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.password import hash_password, verify_password
@@ -31,11 +31,17 @@ async def create_user(db: AsyncSession, data: UserRegister) -> Optional[User]:
     if await get_user_by_email(db, data.email):
         return None
 
+    # 判断是否是第一个注册的用户
+    count_result = await db.execute(select(func.count()).select_from(User))
+    user_count = count_result.scalar() or 0
+    # 第一个用户默认为 admin，后续用户为普通 user
+    role = "admin" if user_count == 0 else "user"
+
     user = User(
         username=data.username,
         email=data.email,
         hashed_password=hash_password(data.password),
-        role="user",
+        role=role,
     )
     db.add(user)
     await db.commit()
