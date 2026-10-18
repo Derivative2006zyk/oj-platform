@@ -1,5 +1,14 @@
 <template>
   <div class="problem-list">
+    <!-- 未连接服务器提示 -->
+    <div v-if="connectionError" class="connection-alert">
+      <span>
+        无法连接到服务器。请确认远程后端已启动，并前往右上角
+        <router-link to="/settings">设置</router-link>
+        配置正确的局域网 IP 地址。
+      </span>
+    </div>
+
     <header class="page-header">
       <h1>题库</h1>
       <p class="page-desc">共 {{ total }} 道题目</p>
@@ -283,6 +292,7 @@ const router = useRouter()
 const route = useRoute()
 
 // ===== 状态 =====
+const connectionError = ref(false)
 const problems = ref<ProblemSummary[]>([])
 const categories = ref<Category[]>([])
 const allTags = ref<string[]>([])
@@ -383,10 +393,15 @@ async function loadProblems() {
     })
     problems.value = Array.isArray(data?.items) ? data.items : []
     total.value = typeof data?.total === 'number' ? data.total : 0
-  } catch (e) {
+    connectionError.value = false
+  } catch (e: any) {
     console.error('加载题目列表失败', e)
     problems.value = []
     total.value = 0
+    // 识别网络断开
+    if (!e.response || e.code === 'ERR_NETWORK' || e.message?.includes('Network Error')) {
+      connectionError.value = true
+    }
   }
   syncUrl()
 }
@@ -629,6 +644,22 @@ onMounted(async () => {
   max-width: 960px;
   margin: 0 auto;
   padding: var(--spacing-xl) var(--spacing-lg);
+}
+
+/* ===== 未连接警告 ===== */
+.connection-alert {
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  margin-bottom: var(--spacing-md);
+  font-size: 14px;
+  border: 1px solid var(--color-warning-text);
+}
+.connection-alert a {
+  color: var(--color-primary);
+  font-weight: bold;
+  text-decoration: underline;
 }
 
 /* ===== 页头 ===== */

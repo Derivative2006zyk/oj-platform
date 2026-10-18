@@ -3,6 +3,7 @@
 mod backend_launcher;
 
 use backend_launcher::ensure_backend_ready;
+use local_ip_address::local_ip;
 use serde::Deserialize;
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
@@ -36,28 +37,48 @@ struct WidgetSummary {
 }
 
 fn main() {
-    // 1. 确保后端就绪
+        // 1. 确保后端就绪
     if let Err(err) = ensure_backend_ready() {
         eprintln!("[launcher] ERROR: {}", err);
 
+        // 允许用户在没有本地环境的情况下，作为“远程客户端”启动
         tauri::Builder::default()
             .plugin(tauri_plugin_dialog::init())
             .setup(move |app| {
                 let handle = app.handle().clone();
                 let msg = format!(
-                    "无法启动后端服务:\n\n{}\n\n请确认:\n1. Docker Desktop 已启动\n2. 项目路径正确\n3. docker 命令可用",
+                    "无法启动本地后端服务:\n\n{}\n\n\
+                    如果你没有安装 Docker，或者这只是局域网内的一台客户机，\n\
+                    你可以点击【继续】进入软件，并在右上角【设置】中填写远程服务器的 IP 地址（如 http://192.168.1.100:8000）。\n\n\
+                    点击【退出】关闭软件。",
                     err
                 );
 
                 handle
                     .dialog()
                     .message(msg)
-                    .title("后端启动失败")
-                    .kind(MessageDialogKind::Error)
-                    .show(|_| {
-                        std::process::exit(1);
+                    .title("未检测到本地后端 (纯客户端模式)")
+                    .kind(MessageDialogKind::Warning)
+                    .buttons(tauri_plugin_dialog::MessageDialogButtons::OkCancelCustom("继续进入".into(), "退出".into()))
+                    .show(move |result| {
+                        if !result {
+                            std::process::exit(1);
+                        }
+                        // 如果用户点继续，则什么都不做，窗口会继续初始化显示
                     });
 
+                // 构建无后端状态下的托盘和窗口
+                build_tray(app)?;
+                
+                if let Some(window) = app.get_webview_window("main") {
+                    let window_clone = window.clone();
+                    window.on_window_event(move |event| {
+                        if let WindowEvent::CloseRequested { api, .. } = event {
+                            api.prevent_close();
+                            let _ = window_clone.hide();
+                        }
+                    });
+                }
                 Ok(())
             })
             .run(tauri::generate_context!())
@@ -72,6 +93,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             update_tray_tooltip,
             refresh_tray_from_backend,
+            get_lan_ip,
         ])
         .setup(|app| {
             build_tray(app)?;
@@ -251,4 +273,13 @@ fn refresh_tray_from_backend(app: AppHandle, token: String) -> Result<(), String
     });
 
     Ok(())
+}
+
+/// 获取本机局域网 IP
+#[tauri::command]
+fn get_lan_ip() -> Result<String, String> {
+    match local_ip() {
+        Ok(ip) => Ok(format!("http://{}:8000", ip)),
+        Err(_) => Err("无法获取局域网 IP".to_string()),
+    }
 }
