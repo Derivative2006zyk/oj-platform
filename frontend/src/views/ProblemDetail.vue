@@ -3,7 +3,7 @@
     <div v-if="loading" class="loading">加载中...</div>
     <div v-else-if="!problem" class="not-found">题目不存在</div>
 
-    <div v-else class="content-wrapper">
+    <div v-else :class="['content-wrapper', { 'focus-mode': isFocusMode }]">
       <!-- ========== 左栏：题目描述 ========== -->
       <div class="left-col">
         <article class="card problem-card">
@@ -156,14 +156,12 @@
         <div v-if="problem.type === 'algorithm'" class="card submit-panel">
           <div class="card-header panel-header-with-action">
             <span>代码提交</span>
-            <button
-              v-if="hasDraft"
-              type="button"
-              class="clear-draft-btn"
-              @click="onClearDraft"
-            >
-              清空
-            </button>
+            <div class="header-actions">
+              <button v-if="hasDraft" @click="onClearDraft" class="clear-btn">清空</button>
+              <button class="btn-ghost focus-btn" @click="toggleFocusMode">
+                {{ isFocusMode ? '退出横屏' : '横屏代码' }}
+              </button>
+            </div>
           </div>
 
           <div v-if="!userStore.isLoggedIn" class="login-tip">
@@ -228,14 +226,7 @@
         <div v-else-if="problem.type === 'choice'" class="card submit-panel">
           <div class="card-header panel-header-with-action">
             <span>选择题作答</span>
-            <button
-              v-if="hasDraft"
-              type="button"
-              class="clear-draft-btn"
-              @click="onClearDraft"
-            >
-              清空
-            </button>
+            <button v-if="hasDraft" @click="onClearDraft" class="clear-btn">清空</button>
           </div>
 
           <div v-if="!userStore.isLoggedIn" class="login-tip">
@@ -293,14 +284,7 @@
         <div v-else-if="problem.type === 'fill_blank'" class="card submit-panel">
           <div class="card-header panel-header-with-action">
             <span>填空题作答</span>
-            <button
-              v-if="hasDraft"
-              type="button"
-              class="clear-draft-btn"
-              @click="onClearDraft"
-            >
-              清空
-            </button>
+            <button v-if="hasDraft" @click="onClearDraft" class="clear-btn">清空</button>
           </div>
 
           <div v-if="!userStore.isLoggedIn" class="login-tip">
@@ -360,14 +344,7 @@
         <div v-else-if="problem.type === 'proof'" class="card submit-panel">
           <div class="card-header panel-header-with-action">
             <span>证明题作答</span>
-            <button
-              v-if="hasDraft"
-              type="button"
-              class="clear-draft-btn"
-              @click="onClearDraft"
-            >
-              清空
-            </button>
+            <button v-if="hasDraft" @click="onClearDraft" class="clear-btn">清空</button>
           </div>
 
           <div v-if="!userStore.isLoggedIn" class="login-tip">
@@ -470,6 +447,8 @@
 <script setup lang="ts">
 import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
+import { Capacitor } from '@capacitor/core'
+import { ScreenOrientation } from '@capacitor/screen-orientation'
 
 import MarkdownRenderer from '../components/MarkdownRenderer.vue'
 import { defineAsyncComponent } from 'vue'
@@ -495,6 +474,9 @@ const problem = ref<ProblemDetail | null>(null)
 
 const answer = ref<{ answer?: string | null; explanation?: string | null } | null>(null)
 const answerVisible = ref(false)
+
+// ===== 代码横屏模式 =====
+const isFocusMode = ref(false)
 
 // ===== 算法题提交面板状态 =====
 const submitPanel = reactive({
@@ -689,7 +671,6 @@ function formatTime(s: string): string {
     // 如果后端返回的时间没有带 'Z'（UTC 标识），手动补上，让浏览器按 UTC 解析并转换为本地时间
     let timeStr = s
     if (!timeStr.endsWith('Z') && !timeStr.includes('+')) {
-      // 把空格换成 T，并补上 Z
       timeStr = timeStr.replace(' ', 'T') + 'Z'
     }
     const d = new Date(timeStr)
@@ -699,6 +680,35 @@ function formatTime(s: string): string {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
   } catch {
     return s
+  }
+}
+
+// ===== 横屏代码模式 =====
+async function toggleFocusMode() {
+  // 如果当前是准备进入横屏，且是手机设备，给出提示
+  if (!isFocusMode.value) {
+    const isPhone = /Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) 
+                    && navigator.userAgent.indexOf('iPad') === -1
+                    
+    if (isPhone) {
+      if (!window.confirm('提示：因手机屏幕较小，软键盘会遮挡部分视野，推荐在平板或电脑端使用横屏代码模式。\n\n是否仍要进入？')) {
+        return // 用户取消，不进入横屏
+      }
+    }
+  }
+
+  isFocusMode.value = !isFocusMode.value
+  
+  if (Capacitor.isNativePlatform()) {
+    try {
+      if (isFocusMode.value) {
+        await ScreenOrientation.lock({ orientation: 'landscape' })
+      } else {
+        await ScreenOrientation.unlock()
+      }
+    } catch (e) {
+      console.warn('屏幕旋转失败', e)
+    }
   }
 }
 
@@ -785,6 +795,11 @@ onUnmounted(() => {
     wsHandle.value.close()
     wsHandle.value = null
   }
+  
+  // 如果卸载时还在强制横屏，解除锁定
+  if (isFocusMode.value && Capacitor.isNativePlatform()) {
+    ScreenOrientation.unlock().catch(() => {})
+  }
 })
 
 // ===== 算法题提交 =====
@@ -813,7 +828,6 @@ async function onSubmit() {
     currentSubmission.value = sub
     openWS(sub.id)
     loadMySubmissions()
-    // 提交后保留输入内容，方便对照答案
   } catch (e: any) {
     const status = e?.response?.status
     if (status === 401) {
@@ -826,7 +840,7 @@ async function onSubmit() {
   }
 }
 
-// ===== 选择题提交（同步判题） =====
+// ===== 选择题提交 =====
 async function onSubmitChoice() {
   submitError.value = ''
 
@@ -850,7 +864,6 @@ async function onSubmitChoice() {
 
     currentSubmission.value = sub
     loadMySubmissions()
-    // 提交后保留选择，方便对照答案
   } catch (e: any) {
     const status = e?.response?.status
     if (status === 401) {
@@ -863,7 +876,7 @@ async function onSubmitChoice() {
   }
 }
 
-// ===== 填空题提交（同步判题） =====
+// ===== 填空题提交 =====
 async function onSubmitFillBlank() {
   submitError.value = ''
 
@@ -887,7 +900,6 @@ async function onSubmitFillBlank() {
 
     currentSubmission.value = sub
     loadMySubmissions()
-    // 提交后保留填空内容，方便对照答案
   } catch (e: any) {
     const status = e?.response?.status
     if (status === 401) {
@@ -900,7 +912,7 @@ async function onSubmitFillBlank() {
   }
 }
 
-// ===== 证明题提交（不判题） =====
+// ===== 证明题提交 =====
 async function handleProofImageSelect(event: Event) {
   const input = event.target as HTMLInputElement
   if (!input.files || input.files.length === 0) return
@@ -954,7 +966,6 @@ async function onSubmitProof() {
 
     currentSubmission.value = sub
     loadMySubmissions()
-    // 提交后保留证明内容和图片，方便对照答案
   } catch (e: any) {
     const status = e?.response?.status
     if (status === 401) {
@@ -1051,6 +1062,80 @@ onMounted(() => {
   gap: var(--spacing-md);
 }
 
+/* ===== 沉浸式横屏代码模式 ===== */
+.content-wrapper.focus-mode {
+  flex-wrap: nowrap;
+  /* 使用 dvh 适配动态视口高度 */
+  height: calc(100dvh - 56px);
+  padding: 0;
+  margin: 0;
+  gap: 0;
+}
+
+.content-wrapper.focus-mode .left-col {
+  display: none !important;
+}
+
+.content-wrapper.focus-mode .right-col {
+  flex: 1 1 100% !important;
+  height: 100%;
+  gap: 0;
+}
+
+.content-wrapper.focus-mode .submit-panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border-radius: 0;
+  box-shadow: none;
+  background: var(--color-bg-card);
+}
+
+/* 注意：这里千万不能隐藏 card-header */
+.content-wrapper.focus-mode .submit-panel > .card-header {
+  display: flex !important;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--color-bg-card);
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--color-border-light);
+  flex-shrink: 0;
+  /* 防止被上方导航栏遮挡 */
+  z-index: 10;
+}
+
+/* 隐藏横屏下不需要的辅助元素 */
+.content-wrapper.focus-mode .form-row,
+.content-wrapper.focus-mode .info-card,
+.content-wrapper.focus-mode .back-link,
+.content-wrapper.focus-mode .login-tip {
+  display: none !important;
+}
+
+/* 编辑器占满中间全部剩余空间 */
+.content-wrapper.focus-mode .editor-wrapper {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  height: auto !important;
+  max-height: none !important;
+  border-radius: 0;
+  border: none;
+}
+
+/* 提交按钮和结果固定在底部并留出空间 */
+.content-wrapper.focus-mode > .submit-panel > .btn-primary {
+  margin: 12px 16px;
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+  padding: 12px 24px;
+}
+
+.content-wrapper.focus-mode .submission-result {
+  margin: 0 16px 12px;
+  flex-shrink: 0;
+}
+
 @media (max-width: 900px) {
   .content-wrapper {
     gap: var(--spacing-lg);
@@ -1086,21 +1171,30 @@ onMounted(() => {
   align-items: center;
 }
 
-.clear-draft-btn {
-  padding: 2px 10px;
-  background: transparent;
-  color: var(--color-text-muted);
-  border: 1px solid var(--color-border-light);
-  border-radius: var(--radius-sm);
-  font-size: 12px;
-  font-family: inherit;
-  cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.clear-draft-btn:hover {
-  border-color: var(--color-danger-text);
+.focus-btn {
+  padding: 2px 10px;
+  font-size: 12px;
+  height: 24px;
+}
+
+.clear-btn {
+  padding: 2px 8px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.clear-btn:hover {
   color: var(--color-danger-text);
+  border-color: var(--color-danger-text);
 }
 
 /* ===== 题目卡片 ===== */
@@ -1294,7 +1388,6 @@ onMounted(() => {
   padding: 20px;
 }
 
-/* ===== 提交历史卡片 ===== */
 .history-card {
   margin-top: var(--spacing-lg);
   overflow: hidden;
@@ -1412,7 +1505,6 @@ onMounted(() => {
   }
 }
 
-/* ===== 提交面板 ===== */
 .submit-panel {
   overflow: visible;
 }
@@ -1462,23 +1554,6 @@ onMounted(() => {
   background: var(--color-bg-card);
   cursor: pointer;
   outline: none;
-}
-
-.code-input {
-  max-width: 100%;
-  padding: 12px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  font-family: var(--font-family-mono);
-  font-size: 13px;
-  line-height: 1.6;
-  resize: both;
-  outline: none;
-  transition: border-color 0.2s;
-}
-
-.code-input:focus {
-  border-color: var(--color-primary);
 }
 
 .btn-primary {
@@ -1581,7 +1656,6 @@ onMounted(() => {
   overflow-y: auto;
 }
 
-/* ===== 题目信息卡片 ===== */
 .info-card {
   padding: var(--spacing-md);
   display: flex;
@@ -1604,7 +1678,6 @@ onMounted(() => {
   color: var(--color-text-primary);
 }
 
-/* ===== 返回链接 ===== */
 .back-link {
   display: inline-block;
   padding: 8px 16px;
@@ -1631,7 +1704,6 @@ onMounted(() => {
   height: 360px;
 }
 
-/* ===== 选择题选项 ===== */
 .choice-options {
   display: flex;
   flex-direction: column;
@@ -1678,7 +1750,6 @@ onMounted(() => {
   word-break: break-word;
 }
 
-/* ===== 填空题输入 ===== */
 .blank-inputs {
   display: flex;
   flex-direction: column;
@@ -1716,7 +1787,6 @@ onMounted(() => {
   border-color: var(--color-primary);
 }
 
-/* ===== 证明题 ===== */
 .proof-form {
   padding: var(--spacing-md);
   display: flex;

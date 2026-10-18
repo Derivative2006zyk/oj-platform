@@ -1,18 +1,43 @@
 <template>
-  <div ref="containerRef" class="code-editor-container"></div>
+  <div class="code-editor-root" :style="{ height: height }">
+    
+    <!-- ===== 移动端专属方案：原生输入 + 工具栏 ===== -->
+    <div v-if="isMobile" class="mobile-editor-wrapper">
+      <textarea
+        ref="textareaRef"
+        v-model="codeText"
+        class="mobile-textarea"
+        placeholder="在此输入代码..."
+        spellcheck="false"
+        @input="onMobileInput"
+      ></textarea>
+      
+      <!-- 移动端快捷符号工具栏 (沉浸式) -->
+      <div class="mobile-toolbar">
+        <button @click="insertText('\t')">Tab</button>
+        <button @click="insertText('{')">{</button>
+        <button @click="insertText('}')">}</button>
+        <button @click="insertText('(')">(</button>
+        <button @click="insertText(')')">)</button>
+        <button @click="insertText('[')">[</button>
+        <button @click="insertText(']')">]</button>
+        <button @click="insertText(';')">;</button>
+        <button @click="insertText('\'')">'</button>
+        <button @click="insertText('&quot;')">"</button>
+        <button @click="insertText(':')">:</button>
+        <button @click="insertText('\n')">↵</button>
+      </div>
+    </div>
+
+    <!-- ===== 桌面端方案：Monaco Editor ===== -->
+    <div v-else ref="editorContainer" class="monaco-container"></div>
+
+  </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
-
-// 只加载编辑器核心 API，不加载全部语言
+import { ref, watch, onMounted, onUnmounted, computed, nextTick } from 'vue'
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api'
-
-// 只加载需要的三种语言
-import 'monaco-editor/esm/vs/basic-languages/python/python.contribution'
-import 'monaco-editor/esm/vs/basic-languages/java/java.contribution'
-import 'monaco-editor/esm/vs/basic-languages/cpp/cpp.contribution'
-
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 
 self.MonacoEnvironment = {
@@ -21,155 +46,197 @@ self.MonacoEnvironment = {
   },
 }
 
-const props = withDefaults(
-  defineProps<{
-    modelValue: string
-    language?: string
-    height?: string
-    readonly?: boolean
-  }>(),
-  {
-    language: 'python',
-    height: '360px',
-    readonly: false,
-  }
-)
+const props = defineProps<{
+  modelValue: string
+  language: string
+  height?: string
+}>()
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: string): void
 }>()
 
-const containerRef = ref<HTMLElement | null>(null)
-let editor: monaco.editor.IStandaloneCodeEditor | null = null
-let resizeObserver: ResizeObserver | null = null
+const isMobile = computed(() => {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+})
 
-function normalizeLanguage(lang: string): string {
-  const map: Record<string, string> = {
-    python: 'python',
-    java: 'java',
-    cpp: 'cpp',
-    'c++': 'cpp',
-  }
-  return map[lang] || 'plaintext'
+// ===== 移动端逻辑 =====
+const codeText = ref(props.modelValue)
+const textareaRef = ref<HTMLTextAreaElement | null>(null)
+
+function onMobileInput() {
+  emit('update:modelValue', codeText.value)
 }
 
+// 插入符号并处理 Tab 缩进
+function insertText(text: string) {
+  const el = textareaRef.value
+  if (!el) return
+
+  const start = el.selectionStart
+  const end = el.selectionEnd
+  const val = el.value
+
+  if (text === '\t') {
+    // 插入 4 个空格代替 Tab
+    el.value = val.substring(0, start) + '    ' + val.substring(end)
+    el.selectionStart = el.selectionEnd = start + 4
+  } else {
+    el.value = val.substring(0, start) + text + val.substring(end)
+    el.selectionStart = el.selectionEnd = start + text.length
+  }
+
+  codeText.value = el.value
+  emit('update:modelValue', el.value)
+  
+  nextTick(() => {
+    el.focus()
+  })
+}
+
+// ===== 桌面端 Monaco 逻辑 =====
+const editorContainer = ref<HTMLElement | null>(null)
+let editorInstance: monaco.editor.IStandaloneCodeEditor | null = null
+let resizeObserver: ResizeObserver | null = null
+
 onMounted(() => {
-  if (!containerRef.value) return
+  if (isMobile.value || !editorContainer.value) return
 
-  // 用 IntersectionObserver 等容器进入视口再初始化
-  const initObserver = new IntersectionObserver((entries) => {
-    if (entries[0].isIntersecting) {
-      initObserver.disconnect()
-      createEditor()
+  editorInstance = monaco.editor.create(editorContainer.value, {
+    value: props.modelValue,
+    language: props.language,
+    theme: 'vs',
+    automaticLayout: false,
+    minimap: { enabled: false },
+    scrollBeyondLastLine: false,
+    fontSize: 14,
+    lineHeight: 1.6,
+    fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+    occurrencesHighlight: 'off',
+    codeLens: false,
+    hover: { enabled: true },
+    quickSuggestions: true,
+    matchBrackets: 'never',
+    folding: false,
+    renderLineHighlight: 'none',
+    guides: { indentation: false },
+  })
+
+  editorInstance.onDidChangeModelContent(() => {
+    const val = editorInstance!.getValue()
+    if (val !== props.modelValue) {
+      emit('update:modelValue', val)
     }
-  }, { rootMargin: '200px' })
+  })
 
-  initObserver.observe(containerRef.value)
+  resizeObserver = new ResizeObserver(() => {
+    editorInstance?.layout()
+  })
+  resizeObserver.observe(editorContainer.value)
+})
 
-  function createEditor() {
-    if (!containerRef.value) return
-
-    editor = monaco.editor.create(containerRef.value, {
-      value: props.modelValue,
-      language: normalizeLanguage(props.language),
-      theme: 'vs',
-      fontSize: 13,
-      fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace",
-      lineNumbers: 'on',
-      minimap: { enabled: false },
-      scrollBeyondLastLine: false,
-      automaticLayout: false,
-      tabSize: 4,
-      insertSpaces: true,
-      wordWrap: 'on',
-      readOnly: props.readonly,
-
-      // ===== 性能优化 =====
-      renderWhitespace: 'none',
-      renderLineHighlight: 'none',
-      occurrencesHighlight: 'off',
-      selectionHighlight: false,
-      codeLens: false,
-      folding: false,
-      glyphMargin: false,
-      lineDecorationsWidth: 8,
-      lineNumbersMinChars: 3,
-      quickSuggestions: false,
-      suggestOnTriggerCharacters: false,
-      wordBasedSuggestions: 'off',
-      parameterHints: { enabled: false },
-      hover: { enabled: false },
-      contextmenu: false,
-      matchBrackets: 'never',
-      guides: { indentation: false },
-      smoothScrolling: false,
-      cursorBlinking: 'blink',
-      padding: { top: 12, bottom: 12 },
-      scrollbar: {
-        verticalScrollbarSize: 8,
-        horizontalScrollbarSize: 8,
-        useShadows: false,
-      },
-    })
-
-    editor.onDidChangeModelContent(() => {
-      emit('update:modelValue', editor!.getValue())
-    })
-
-    resizeObserver = new ResizeObserver(() => {
-      editor?.layout()
-    })
-    resizeObserver.observe(containerRef.value)
+onUnmounted(() => {
+  if (resizeObserver) resizeObserver.disconnect()
+  if (editorInstance) {
+    editorInstance.dispose()
+    editorInstance = null
   }
 })
 
-onBeforeUnmount(() => {
-  if (resizeObserver && containerRef.value) {
-    resizeObserver.unobserve(containerRef.value)
-  }
-  resizeObserver = null
-
-  if (editor) {
-    editor.dispose()
-    editor = null
+watch(() => props.modelValue, (newVal) => {
+  if (isMobile.value) {
+    if (newVal !== codeText.value) {
+      codeText.value = newVal
+    }
+  } else {
+    if (editorInstance && newVal !== editorInstance.getValue()) {
+      editorInstance.setValue(newVal)
+    }
   }
 })
 
-// 外部 v-model 变化 → 更新编辑器
-watch(
-  () => props.modelValue,
-  (newVal) => {
-    if (!editor) return
-    if (editor.getValue() !== newVal) {
-      editor.setValue(newVal || '')
-    }
+watch(() => props.language, (newLang) => {
+  if (!isMobile.value && editorInstance) {
+    const model = editorInstance.getModel()
+    if (model) monaco.editor.setModelLanguage(model, newLang)
   }
-)
-
-// 语言切换
-watch(
-  () => props.language,
-  (newLang) => {
-    if (!editor) return
-    const model = editor.getModel()
-    if (model) {
-      monaco.editor.setModelLanguage(model, normalizeLanguage(newLang))
-    }
-  }
-)
+})
 </script>
 
 <style scoped>
-.code-editor-container {
+.code-editor-root {
   width: 100%;
-  height: v-bind(height);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
   overflow: hidden;
-  background: #fff;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-card);
+  display: flex;
+  flex-direction: column;
 }
 
-.code-editor-container:focus-within {
-  border-color: var(--color-primary);
+.monaco-container {
+  width: 100%;
+  height: 100%;
+}
+
+/* 移动端编辑器容器 */
+.mobile-editor-wrapper {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: #f9fafb;
+}
+
+/* 移动端输入框 */
+.mobile-textarea {
+  flex: 1;
+  width: 100%;
+  padding: 12px;
+  border: none;
+  resize: none;
+  outline: none;
+  background: transparent;
+  color: #1d1d1f;
+  font-family: 'Consolas', 'Monaco', monospace;
+  /* 针对 1440P 高分辨率屏幕，字号适当调大 */
+  font-size: 15px;
+  line-height: 1.6;
+  box-sizing: border-box;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+/* 移动端快捷符号工具栏 */
+.mobile-toolbar {
+  display: flex;
+  gap: 8px;
+  padding: 10px;
+  background: #e5e7eb;
+  border-top: 1px solid #d1d5db;
+  overflow-x: auto;
+  scrollbar-width: none;
+  /* 防止被键盘挤压 */
+  flex-shrink: 0;
+}
+
+.mobile-toolbar::-webkit-scrollbar {
+  display: none;
+}
+
+.mobile-toolbar button {
+  padding: 8px 14px;
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-family: monospace;
+  font-size: 16px;
+  color: #374151;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.mobile-toolbar button:active {
+  background: #e5e7eb;
+  transform: translateY(1px);
 }
 </style>

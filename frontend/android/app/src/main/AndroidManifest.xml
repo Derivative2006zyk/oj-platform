@@ -17,7 +17,9 @@
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize" 
             android:exported="true">
+            <!-- 删掉了强制竖屏，让插件可以控制 -->
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -47,7 +49,4 @@
         </receiver>
     </application>
 
-    <!-- Permissions -->
-
-    <uses-permission android:name="android.permission.INTERNET" />
 </manifest>
