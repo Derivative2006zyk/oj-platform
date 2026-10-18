@@ -5,7 +5,8 @@ const config: CapacitorConfig = {
   appName: 'OJ Platform',
   webDir: 'dist',
   server: {
-    androidScheme: 'https',
+    androidScheme: 'http', 
+    cleartext: true 
   },
 };
 
