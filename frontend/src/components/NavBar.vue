@@ -1,7 +1,7 @@
 <template>
   <header class="navbar">
     <div class="navbar-content">
-      <router-link to="/" class="brand">OJ Platform</router-link>
+      <router-link to="/" class="brand">OJ</router-link>
 
       <nav class="nav-links">
         <router-link to="/" class="nav-link">题库</router-link>
@@ -23,10 +23,12 @@
             <span class="username">{{ userStore.user?.username }}</span>
             <span v-if="userStore.isAdmin" class="badge">管理员</span>
           </router-link>
-          <a href="#" class="nav-link" @click.prevent="onLogout">登出</a>
+          <router-link to="/settings" class="nav-link">设置</router-link>
+          <a href="#" class="nav-link logout-btn" @click.prevent="onLogout">登出</a>
         </template>
 
         <template v-else>
+          <router-link to="/settings" class="nav-link">设置</router-link>
           <router-link to="/login" class="nav-link">登录</router-link>
           <router-link to="/register" class="nav-link register-btn">注册</router-link>
         </template>
@@ -59,6 +61,7 @@ function onLogout() {
   -webkit-backdrop-filter: blur(12px);
   box-shadow: var(--shadow-nav);
   border-bottom: 1px solid var(--color-border-light);
+  width: 100%;
 }
 
 .navbar-content {
@@ -66,38 +69,49 @@ function onLogout() {
   width: 100%;
   margin: 0 auto;
   height: 100%;
-  padding: 0 var(--spacing-lg);
+  padding: 0 var(--spacing-md);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--spacing-md);
+  gap: var(--spacing-sm);
+  /* 防止内部元素撑开父级 */
+  min-width: 0;
 }
 
 .brand {
   font-size: 18px;
   font-weight: 700;
-  letter-spacing: -0.3px;
   color: var(--color-primary);
   white-space: nowrap;
   flex-shrink: 0;
 }
 
+/* 导航链接区 */
 .nav-links {
   display: flex;
   gap: clamp(8px, 2vw, 24px);
   flex-wrap: nowrap;
   align-items: center;
-  flex-shrink: 0;
+  /* 允许横向滚动 */
+  overflow-x: auto;
+  scrollbar-width: none;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.nav-links::-webkit-scrollbar {
+  display: none;
 }
 
 .nav-link {
-  font-size: var(--font-size-body);
+  font-size: 14px;
   color: var(--color-text-secondary);
-  padding: 6px 10px;
+  padding: 6px 8px;
   border-radius: var(--radius-md);
   white-space: nowrap;
   cursor: pointer;
   transition: background 0.2s, color 0.2s;
+  flex-shrink: 0;
 }
 
 .nav-link:hover {
@@ -115,25 +129,21 @@ function onLogout() {
   color: var(--color-primary-text);
 }
 
-.register-btn:hover {
-  background: var(--color-primary-hover);
-  color: white;
-}
-
 .right-section {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: 4px;
   flex-shrink: 0;
 }
 
 .user-area {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
-  padding: 4px 8px;
+  gap: 6px;
+  padding: 4px 6px;
   border-radius: var(--radius-md);
   transition: background 0.2s;
+  flex-shrink: 0;
 }
 
 .user-area:hover {
@@ -141,8 +151,8 @@ function onLogout() {
 }
 
 .avatar {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   background: var(--color-primary);
   color: var(--color-primary-text);
@@ -155,9 +165,9 @@ function onLogout() {
 }
 
 .username {
-  font-size: var(--font-size-body);
+  font-size: 14px;
   color: var(--color-text-primary);
-  max-width: 100px;
+  max-width: 80px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -172,32 +182,24 @@ function onLogout() {
   font-weight: 500;
 }
 
-@media (max-width: 768px) {
-  .navbar-content {
-    padding: 0 var(--spacing-md);
-  }
+.logout-btn {
+  color: var(--color-danger-text);
+}
 
-  .nav-links {
-    gap: 4px;
+/* ===== 移动端深度适配 ===== */
+@media (max-width: 768px) {
+  .brand {
+    font-size: 16px;
+  }
+  
+  .username,
+  .badge {
+    display: none; /* 手机上隐藏用户名和徽章，只留头像 */
   }
 
   .nav-link {
     font-size: 13px;
-    padding: 6px 6px;
-  }
-
-  .username {
-    display: none;
-  }
-}
-
-@media (max-width: 500px) {
-  .brand {
-    font-size: 16px;
-  }
-
-  .badge {
-    display: none;
+    padding: 6px;
   }
 }
 </style>

@@ -36,7 +36,7 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/ProblemEdit.vue'),
     meta: { requiresAuth: true },
   },
-    {
+  {
     path: '/submissions',
     name: 'submission-list',
     component: () => import('../views/SubmissionList.vue'),
@@ -59,6 +59,13 @@ const routes: RouteRecordRaw[] = [
     name: 'admin-stats',
     component: () => import('../views/AdminStats.vue'),
     meta: { requiresAuth: true, requiresAdmin: true },
+  },
+  // 新增设置页（允许免登录访问）
+  {
+    path: '/settings',
+    name: 'settings',
+    component: () => import('../views/Settings.vue'),
+    // 去掉 meta: { requiresAuth: true }
   },
 ]
 

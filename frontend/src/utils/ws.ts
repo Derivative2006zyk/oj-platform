@@ -1,3 +1,5 @@
+import { getWsBaseUrl } from './backend-url'
+
 export interface WSMessage {
   type: 'status' | 'judged'
   submission_id: number
@@ -18,7 +20,11 @@ export function openSubmissionWS(
   onError?: (e: Event) => void
 ): SubmissionWSHandle {
   const token = localStorage.getItem('oj_token') || ''
-  const url = `ws://127.0.0.1:8000/api/submissions/${submissionId}/ws?token=${encodeURIComponent(token)}`
+  
+  // 动态获取 WebSocket Base URL
+  const base = getWsBaseUrl()
+  const url = `${base}/api/submissions/${submissionId}/ws?token=${encodeURIComponent(token)}`
+  
   const ws = new WebSocket(url)
 
   ws.onmessage = (e) => {

@@ -21,6 +21,9 @@ import NavBar from './components/NavBar.vue'
 html,
 body {
   min-height: 100%;
+  width: 100%;
+  /* 允许双指放大后出现横向滚动条 */
+  overflow-x: auto;
 }
 
 body {
@@ -30,12 +33,18 @@ body {
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   background-color: var(--color-bg-page);
+  /* 防止放大时触摸变成选中文本（可选，防止误触） */
+  -webkit-touch-callout: none;
 }
 
 #app-root {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  width: 100%;
+  overflow-x: auto;
+  /* 确保内容区撑满 */
+  min-width: 100vw; 
 }
 
 a {
