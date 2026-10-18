@@ -58,9 +58,11 @@ async function onSubmit() {
       username: form.username,
       password: form.password,
     })
-
-    const redirect = (route.query.redirect as string) || '/'
-    router.push(redirect)
+    // 延迟跳转，等 Webview 缓一口气
+    setTimeout(() => {
+      const redirect = (route.query.redirect as string) || '/'
+      router.push(redirect)
+    }, 100)
   } catch (e: any) {
     const status = e?.response?.status
     if (status === 401) {

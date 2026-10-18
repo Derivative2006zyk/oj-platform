@@ -5,24 +5,27 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { marked } from '../utils/marked'
+import { getBackendUrl } from '../utils/backend-url'
 
 const props = defineProps<{ content: string }>()
-
-// 后端地址：统一用 127.0.0.1，避免 Windows IPv6 解析问题
-const BACKEND_URL = 'http://127.0.0.1:8000'
 
 const rendered = computed(() => {
   if (!props.content) return ''
   let content = String(props.content)
 
-  // 1. 兼容旧格式：/api/image/ → /api/images/
+  // 获取用户配置的后端地址，如果是空说明走默认相对路径
+  const base = getBackendUrl()
+
+  // 1. 兼容旧格式：单数 /api/image/ -> 复数 /api/images/
   content = content.replace(/\/api\/image\//g, '/api/images/')
 
-  // 2. 把 ![alt](/api/xxx) 替换为绝对地址
-  content = content.replace(
-    /!\[([^\]]*)\]\(\/api\//g,
-    `![$1](${BACKEND_URL}/api/`
-  )
+  // 2. 把 Markdown 图片中的相对路径 /api/... 替换为后端绝对地址
+  if (base) {
+    content = content.replace(
+      /!\[([^\]]*)\]\(\/api\//g,
+      `![$1](${base}/api/`
+    )
+  }
 
   return marked(content)
 })

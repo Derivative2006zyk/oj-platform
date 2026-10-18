@@ -61,9 +61,13 @@ export const useUserStore = defineStore('user', () => {
 
     // 拉用户信息
     const u = await fetchMe()
-
-    // 刷新托盘 tooltip
     refreshTrayFromBackend(res.access_token).catch(() => {})
+  
+    // 稍微延迟一下跳转，避免同步渲染导致 WebView 卡死
+    setTimeout(() => {
+      // 注意这里，如果你在 Login.vue 里做了跳转，这里就不需要。
+      // 这里假设 store 里不管跳转，交给外部。
+    }, 50)
 
     return u
   }
