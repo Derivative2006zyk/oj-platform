@@ -7,9 +7,11 @@ WORKDIR /app
 ENV TZ=Asia/Shanghai
 ENV PYTHONUNBUFFERED=1
 
-# 安装系统依赖（asyncpg 编译需要）
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# 替换 Debian 软件源为清华镜像，解决 apt 下载卡死的问题
+RUN sed -i 's/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list.d/debian.sources \
+    && apt-get update && apt-get install -y --no-install-recommends \
     gcc \
+    postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 # 先复制依赖清单，利用 Docker 层缓存
