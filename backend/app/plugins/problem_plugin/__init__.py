@@ -25,7 +25,8 @@ class ProblemPlugin(Plugin):
         from app.plugins.problem_plugin.admin_api import router as admin_router
         from app.plugins.problem_plugin.bank_api import router as bank_router
         from app.plugins.problem_plugin.bank_crud_api import router as bank_crud_router
-        return [problem_router, image_router, admin_router, bank_router, bank_crud_router]
+        from app.plugins.problem_plugin.backup_api import router as backup_router
+        return [problem_router, image_router, admin_router, bank_router, bank_crud_router, backup_router]
 
     # ===== 事件处理器 =====
 
