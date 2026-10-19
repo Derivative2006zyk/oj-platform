@@ -5,6 +5,31 @@
         <h1>设置</h1>
         <p class="page-desc">配置应用连接与网络</p>
       </header>
+      <!-- 数据管理 -->
+      <section class="card" style="margin-top: var(--spacing-lg);">
+        <div class="card-header">
+          <span>数据备份与恢复</span>
+        </div>
+        <div class="card-body">
+          <p class="hint">导出包含所有题库、账号和上传图片的完整 ZIP 包。恢复操作会覆盖当前所有数据，请谨慎操作。</p>
+          
+          <div class="actions">
+            <button class="btn-primary" @click="onBackup" :disabled="backingUp">
+              {{ backingUp ? '备份中...' : '导出备份' }}
+            </button>
+            <button class="btn-ghost" style="color: var(--color-danger-text); border-color: var(--color-danger-text);" @click="onRestoreClick" :disabled="restoring">
+              {{ restoring ? '恢复中...' : '从备份恢复' }}
+            </button>
+            <input
+              ref="fileInputRef"
+              type="file"
+              accept=".zip"
+              style="display: none;"
+              @change="onRestoreFileChange"
+            />
+          </div>
+        </div>
+      </section>
 
       <section class="card">
         <div class="card-header">
@@ -51,6 +76,72 @@
 import { ref, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { getBackendUrl, setBackendUrl, isTauriEnv } from '../utils/backend-url'
+import api from '../utils/axios'
+
+
+const backingUp = ref(false)
+const restoring = ref(false)
+const fileInputRef = ref<HTMLInputElement | null>(null)
+
+async function onBackup() {
+  backingUp.value = true
+  try {
+    // 提示：如果提示未授权，需要确保本地保存了 admin_key
+    const adminKey = localStorage.getItem('admin_key') || ''
+    
+    const res = await api.get('/admin/backup/export', {
+      headers: { 'X-Admin-Key': adminKey },
+      responseType: 'blob'
+    })
+    
+    // 下载文件
+    const url = URL.createObjectURL(res.data)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `oj_backup_${Date.now()}.zip`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  } catch (e: any) {
+    alert('导出失败：' + (e.response?.data?.detail || e.message))
+  } finally {
+    backingUp.value = false
+  }
+}
+
+function onRestoreClick() {
+  if (confirm('警告：恢复数据会覆盖当前所有的题库、账号和提交记录！\n\n确定要继续吗？')) {
+    fileInputRef.value?.click()
+  }
+}
+
+async function onRestoreFileChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  if (!input.files || input.files.length === 0) return
+  const file = input.files[0]
+  
+  restoring.value = true
+  const formData = new FormData()
+  formData.append('file', file)
+  
+  try {
+    const adminKey = localStorage.getItem('admin_key') || ''
+    await api.post('/admin/backup/import', formData, {
+      headers: { 
+        'X-Admin-Key': adminKey,
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+    alert('恢复成功！建议重启软件以确保数据完全同步。')
+    window.location.reload()
+  } catch (e: any) {
+    alert('恢复失败：' + (e.response?.data?.detail || e.message))
+  } finally {
+    restoring.value = false
+    input.value = ''
+  }
+}
 
 const currentUrl = ref('')
 const inputUrl = ref('')
