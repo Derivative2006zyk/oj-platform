@@ -124,6 +124,12 @@
           <div class="problem-meta">
             <span class="type-badge">{{ typeLabel(problem.type) }}</span>
             <span class="difficulty">{{ '★'.repeat(problem.difficulty) }}</span>
+            
+            <!-- 新增管理员操作按钮 -->
+            <div v-if="userStore.isAdmin" class="admin-actions">
+              <button class="action-btn edit-btn" @click.stop="goEdit(problem.id)">编辑</button>
+              <button class="action-btn delete-btn" @click.stop="onDelete(problem.id)">删除</button>
+            </div>
           </div>
         </div>
       </div>
@@ -288,6 +294,11 @@ import {
   type ImportResult,
 } from '../api/bank'
 
+import { useUserStore } from '../stores/user'
+import { deleteProblem } from '../api/problem' // 注意路径，确保 api 文件夹下有这个方法
+
+const userStore = useUserStore()
+
 const router = useRouter()
 const route = useRoute()
 
@@ -448,7 +459,25 @@ function goDetail(id: number) {
 function goCreate() {
   router.push('/admin/problem/new')
 }
+function goEdit(id: number) {
+  router.push(`/admin/problem/${id}/edit`)
+}
 
+async function onDelete(id: number) {
+  if (!confirm('确定要删除这道题目吗？相关的提交记录也会被一并删除！')) return
+  
+  try {
+    // 如果后端 deleteProblem 需要 X-Admin-Key，你需要在本地存一下
+    const adminKey = prompt('请输入管理员密钥以确认删除:', localStorage.getItem('admin_key') || 'admin-key-change-me')
+    if (!adminKey) return
+    localStorage.setItem('admin_key', adminKey)
+    
+    await deleteProblem(id)
+    loadProblems() // 刷新列表
+  } catch (e: any) {
+    alert('删除失败：' + (e.response?.data?.detail || e.message))
+  }
+}
 // ===== 导出 =====
 async function onExport() {
   if (exporting.value) return
@@ -1231,4 +1260,32 @@ onMounted(async () => {
     padding: var(--spacing-md);
   }
 }
+
+/* 管理员操作按钮 */
+.admin-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: var(--spacing-md);
+}
+
+.action-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-card);
+  transition: all 0.2s;
+}
+
+.edit-btn:hover {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.delete-btn:hover {
+  color: var(--color-danger-text);
+  border-color: var(--color-danger-text);
+}
+
 </style>
