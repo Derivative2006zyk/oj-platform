@@ -2,6 +2,9 @@
 
 多端互通模块化开源刷题系统
 
+[![Build Check](https://github.com/Derivative2006zyk/oj-platform/actions/workflows/build.yml/badge.svg)](https://github.com/Derivative2006zyk/oj-platform/actions/workflows/build.yml)
+[![Release](https://github.com/Derivative2006zyk/oj-platform/actions/workflows/release.yml/badge.svg)](https://github.com/Derivative2006zyk/oj-platform/actions/workflows/release.yml)
+
 ## 简介
 
 一个面向数学与编程双场景的个人开源刷题工具，覆盖 Web、Windows、Linux，并支持通过局域网连接移动端。支持多题型题库管理、在线代码判题、实时状态推送。
@@ -11,15 +14,18 @@
 ## 当前版本
 
 - **0.1.0**（已发布）：题库中心，5 种题型管理 + 图片 + Markdown
-- **0.2.0**（开发完成）：微内核 + 用户系统 + 三语言判题 + WebSocket + 桌面端打包 + 题库导入导出
+- **0.2.0**（已发布）：微内核 + 用户系统 + 三语言判题 + WebSocket + 桌面端打包 + 题库导入导出 + 数据备份恢复
 
 ## 核心特性
 
-- **多端互通**：支持 Windows 桌面端、Web 端，并通过局域网与移动端数据互通。
+- **多端互通**：支持 Windows 桌面端、Web 端，并通过局域网与移动端（Android App）数据互通。
 - **安全沙箱判题**：基于 Docker 隔离的本地判题系统，支持 Python、Java、C++ 多语言安全运行。
 - **多种题型**：支持算法题、选择题、填空题、证明题、科研项目等多种题型。
-- **题库导入导出**：一键打包题库为 ZIP，支持分类与题库折叠筛选，支持一键导入恢复。
-- **极简部署**：无需手动配置 Python/Node 环境，桌面端双击安装，内置启动器自动调度 Docker 引擎拉起底层服务。
+- **题库管理**：一键导入导出题库为 ZIP，支持按题库折叠筛选；管理员在列表页可快捷编辑/删除题目。
+- **数据无忧**：支持一键打包备份全量数据库与图片，换机或重装时可一键恢复。
+- **极简部署**：无需手动配置环境，桌面端双击安装，启动器自动调度 Docker 拉起服务。
+- **纯客户端模式**：如果本机未安装 Docker，可作为客户端连接局域网内其他机器的后端服务。
+- **首位管理员**：系统初始化后，第一个注册的账号自动获得管理员权限。
 
 ---
 
@@ -28,7 +34,7 @@
 ### 系统要求
 
 - **操作系统**：Windows 10/11 (x64)
-- **运行环境**：必须安装 [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+- **运行环境**：推荐安装 [Docker Desktop](https://www.docker.com/products/docker-desktop/)（如不安装，需连接局域网内已部署后端的服务器）
 - **浏览器核心**：WebView2 Runtime（Windows 11 已内置，Windows 10 可能需要单独安装）
 
 ### 快速安装步骤
@@ -57,6 +63,11 @@
 
 3. 点击 Apply & Restart，等待 Docker 重启完成。
 
+### 纯客户端模式（无本地 Docker）
+
+如果本机未安装 Docker，双击启动软件时，系统会提示“未检测到本地后端”。
+点击“继续进入”，然后在右上角（免登录状态下）直接进入 **设置** 页面，在“修改后端地址”中填入局域网服务器的 IP（如 `http://192.168.1.100:8000`），点击“测试连接”并保存即可。
+
 ### 移动端连接（局域网）
 
 若需在手机或平板上使用，请确保设备与电脑连接同一个 WiFi。
@@ -74,12 +85,15 @@
 - **macOS**: `~/Library/Application Support/oj-platform/`
 - **Linux**: `~/.local/share/oj-platform/`
 
+### 数据备份与恢复
+
+**强烈建议定期备份**。进入桌面端右上角「设置」，点击「导出备份」即可生成包含数据库与图片的完整 ZIP 包。
+若需恢复，点击「从备份恢复」并选择之前的 ZIP 文件即可。
+
 ### 高危操作：彻底重置软件（清空所有数据）
 
 **【警告】平时更新软件、卸载重装或重启 Docker 都不需要执行此操作。**
 只有在遇到数据库严重损坏，或者你想把软件彻底恢复成全新纯净状态时，才需要使用以下命令。此操作会永久删除所有题库、账号及提交记录，且无法恢复。执行前请务必完全退出 OJ Platform 软件。
-
-请根据你使用的终端，选择对应的命令执行：
 
 - CMD（命令提示符）:
   ```cmd
@@ -188,10 +202,11 @@ npm run tauri build
 | Pinia | 2.x | 状态管理 |
 | Vue Router | 4.x | 路由 |
 | Axios | 1.x | HTTP 客户端 |
-| Monaco Editor | 0.52.2 | 代码编辑器 |
+| Monaco Editor | 0.52.2 | 代码编辑器（桌面端） |
 | Marked | 12.x+ | Markdown 渲染 |
 | Tauri | 2.x | 桌面壳 |
 | Rust | 1.75+ | 原生逻辑与启动器 |
+| Capacitor | 6.x+ | 移动端原生容器 |
 
 ---
 
@@ -226,8 +241,12 @@ npm run tauri build
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | POST | `/api/admin/problems` | 创建题目 |
+| PUT | `/api/admin/problems/{id}` | 修改题目 |
+| DELETE | `/api/admin/problems/{id}` | 删除题目 |
 | POST | `/api/admin/bank/export` | 导出题库 |
 | POST | `/api/admin/bank/import` | 导入题库 |
+| GET | `/api/admin/backup/export` | 导出全量备份 |
+| POST | `/api/admin/backup/import` | 恢复全量备份 |
 | GET | `/api/admin/users` | 用户列表（JWT） |
 | GET | `/api/admin/stats` | 全局统计（JWT） |
 
@@ -260,13 +279,15 @@ docker compose restart backend
 
 ## 更新日志
 
-### v0.2.0（当前版本）
+### v0.2.0（2026-10-19 发布）
 
-- 微内核架构重构与用户系统
+- 微内核架构重构与用户系统（首个注册用户默认管理员）
 - Python / Java / C++ 在线判题与 Docker 安全隔离
 - WebSocket 实时状态推送与 Monaco Editor 集成
 - 题库导入导出与题库分类折叠
-- Tauri 桌面端支持，内置自动拉起引擎与镜像加速引导
+- 全量数据一键备份与恢复
+- Tauri 桌面端支持：内置自动拉起引擎与镜像加速引导；支持纯客户端模式连接局域网后端
+- Android 客户端支持：免登录配置局域网 IP、双指缩放、横屏代码模式
 
 ### v0.1.0
 
