@@ -1,236 +1,119 @@
 import importlib
-import inspect
+import importlib.util
 import pkgutil
-from pathlib import Path
+import sys
 from typing import Dict, List, Type
+from pathlib import Path
+from fastapi import APIRouter
 
 from app.core.plugin_base import Plugin
 
+# 全局变量，用于收集被 @register_plugin 装饰的类
+_plugin_classes: List[Type[Plugin]] = []
+_registry_instance = None
+
+def register_plugin(cls: Type[Plugin]) -> Type[Plugin]:
+    """装饰器：标记一个类为插件，并将其加入全局列表"""
+    if not issubclass(cls, Plugin):
+        raise TypeError(f"{cls} is not a subclass of Plugin")
+    _plugin_classes.append(cls)
+    return cls
+
 
 class PluginRegistry:
-    """插件注册表。
-
-    项目总览 3.6.2 节：基座通过注册表发现和挂载插件。
-    使用方式：
-        registry = PluginRegistry()
-        registry.discover("app.plugins")
-        await registry.load_all()
-        for router in registry.collect_routers():
-            app.include_router(router)
-    """
-
-    def __init__(self) -> None:
+    def __init__(self):
         self._plugins: Dict[str, Plugin] = {}
-        self._plugin_classes: Dict[str, Type[Plugin]] = {}
-        self._loaded = False
-
-    # ============ 注册 ============
-
-    def register(self, plugin_cls: Type[Plugin]) -> Type[Plugin]:
-        """注册一个插件类。由 @register_plugin 装饰器调用。"""
-        if not plugin_cls.name:
-            raise ValueError(
-                f"Plugin {plugin_cls.__name__} must define a non-empty 'name'"
-            )
-        if plugin_cls.name in self._plugin_classes:
-            existing = self._plugin_classes[plugin_cls.name]
-            raise ValueError(
-                f"Plugin name conflict: '{plugin_cls.name}' "
-                f"already registered by {existing.__name__}"
-            )
-        self._plugin_classes[plugin_cls.name] = plugin_cls
-        return plugin_cls
-
-    # ============ 发现 ============
 
     def discover(self, package: str) -> None:
-        """扫描指定包下所有模块，触发 @register_plugin 装饰器。
-
-        参数 package 为 Python 包路径，如 "app.plugins"。
-        """
+        """扫描内置插件 (app.plugins)"""
         try:
-            pkg = importlib.import_module(package)
-        except ImportError as e:
-            print(f"[PluginRegistry] cannot import package {package}: {e}")
+            mod = importlib.import_module(package)
+            for _, name, _ in pkgutil.iter_modules(mod.__path__):
+                module_name = f"{package}.{name}"
+                try:
+                    importlib.import_module(module_name)
+                except Exception as e:
+                    print(f"[PluginRegistry] Error loading {module_name}: {e}")
+        except Exception as e:
+            print(f"[PluginRegistry] Error discovering {package}: {e}")
+
+    def discover_external(self, plugin_dir: str) -> None:
+        """扫描外部插件目录 (/app/plugins_installed)"""
+        path = Path(plugin_dir)
+        if not path.exists():
             return
-
-        if not hasattr(pkg, "__path__"):
-            # 不是包，直接返回
-            return
-
-        for _, mod_name, _ in pkgutil.walk_packages(
-            pkg.__path__, prefix=f"{package}."
-        ):
-            try:
-                importlib.import_module(mod_name)
-            except Exception as e:
-                print(f"[PluginRegistry] failed to import {mod_name}: {e}")
-
-    # ============ 实例化与生命周期 ============
+            
+        for item in path.iterdir():
+            if item.is_dir():
+                manifest_file = item / "manifest.json"
+                entry_file = item / "backend" / "__init__.py"
+                
+                if manifest_file.exists() and entry_file.exists():
+                    plugin_name = item.name
+                    print(f"[PluginRegistry] Found external plugin: {plugin_name}")
+                    
+                    # 动态加载外部模块
+                    try:
+                        # 注意：这里需要给模块一个唯一的名称
+                        mod_name = f"ext_plugin_{plugin_name}"
+                        spec = importlib.util.spec_from_file_location(mod_name, entry_file)
+                        module = importlib.util.module_from_spec(spec)
+                        sys.modules[mod_name] = module
+                        spec.loader.exec_module(module)
+                    except Exception as e:
+                        print(f"[PluginRegistry] Failed to load external plugin {plugin_name}: {e}")
 
     def _build_instances(self) -> None:
-        """实例化所有已注册的插件类。"""
-        for name, cls in self._plugin_classes.items():
-            if name not in self._plugins:
-                self._plugins[name] = cls()
+        """将全局列表中收集到的类实例化，存入 _plugins 字典"""
+        for cls in _plugin_classes:
+            try:
+                instance = cls()
+                self._plugins[instance.name] = instance
+            except Exception as e:
+                print(f"[PluginRegistry] Error instantiating {cls.__name__}: {e}")
 
     async def load_all(self) -> None:
-        """依次加载所有插件。根据 DB 中的 enabled 状态决定是否调用 on_load/on_enable。"""
-        if self._loaded:
-            return
-
-        self._build_instances()
-
-        # 从 DB 加载启用状态
-        from app.core.plugin_config_store import ensure_config, get_all_configs
-        await self._sync_configs_to_db()
-
-        db_configs = await get_all_configs()
-
-        ordered = self._topological_order()
-
-        for name in ordered:
-            plugin = self._plugins[name]
-            db_config = db_configs.get(name)
-            enabled = db_config.enabled if db_config else True
-
-            if not enabled:
-                print(f"[PluginRegistry] skipped (disabled): {name}")
-                continue
-
+        """加载所有插件（暂不实现复杂拓扑排序，直接遍历）"""
+        for name, plugin in self._plugins.items():
             try:
                 await plugin.on_load()
-                await plugin.on_enable()
                 print(f"[PluginRegistry] loaded: {name} v{plugin.version}")
             except Exception as e:
-                print(f"[PluginRegistry] failed to load {name}: {e}")
-                raise
-
-        self._loaded = True
-
-    async def _sync_configs_to_db(self) -> None:
-        """把新发现的插件写入 DB（如果还没记录），保持已有记录。"""
-        from app.core.plugin_config_store import ensure_config
-        for name in self._plugins:
-            await ensure_config(name, default_enabled=True)
+                print(f"[PluginRegistry] load error {name}: {e}")
 
     async def unload_all(self) -> None:
-        """逆序卸载所有插件。"""
-        if not self._loaded:
-            return
-
-        ordered = self._topological_order()
-
-        for name in reversed(ordered):
-            plugin = self._plugins[name]
+        for name, plugin in self._plugins.items():
             try:
-                await plugin.on_disable()
                 await plugin.on_unload()
-                print(f"[PluginRegistry] unloaded: {name}")
-            except Exception as e:
-                print(f"[PluginRegistry] failed to unload {name}: {e}")
-
-        self._loaded = False
+            except Exception:
+                pass
 
     async def enable(self, name: str) -> None:
-        """启用某插件，同时回写 DB。"""
-        plugin = self._plugins.get(name)
-        if plugin is None:
-            raise KeyError(f"Plugin not found: {name}")
-        await plugin.on_enable()
-        from app.core.plugin_config_store import set_enabled
-        await set_enabled(name, True)
-        print(f"[PluginRegistry] enabled: {name}")
+        if name in self._plugins:
+            await self._plugins[name].on_enable()
 
     async def disable(self, name: str) -> None:
-        """禁用某插件，同时回写 DB。"""
-        plugin = self._plugins.get(name)
-        if plugin is None:
-            raise KeyError(f"Plugin not found: {name}")
-        await plugin.on_disable()
-        from app.core.plugin_config_store import set_enabled
-        await set_enabled(name, False)
-        print(f"[PluginRegistry] disabled: {name}")
-
-    # ============ 查询 ============
+        if name in self._plugins:
+            await self._plugins[name].on_disable()
 
     def get(self, name: str) -> Plugin:
-        plugin = self._plugins.get(name)
-        if plugin is None:
-            raise KeyError(f"Plugin not found: {name}")
-        return plugin
+        return self._plugins.get(name)
 
     def list_plugins(self) -> List[Dict[str, str]]:
-        result = []
-        for name, plugin in self._plugins.items():
-            result.append({
-                "name": name,
-                "version": plugin.version,
-                "dependencies": ",".join(plugin.dependencies),
-            })
-        return result
+        return [
+            {"name": p.name, "version": p.version, "dependencies": ",".join(p.dependencies)}
+            for p in self._plugins.values()
+        ]
 
-    def collect_routers(self):
-        """收集所有插件的路由。"""
+    def collect_routers(self) -> List[APIRouter]:
         routers = []
         for plugin in self._plugins.values():
             routers.extend(plugin.get_routers())
         return routers
 
-    # ============ 内部 ============
-
-    def _topological_order(self) -> List[str]:
-        """按依赖拓扑排序。无依赖的插件先排。"""
-        ordered: List[str] = []
-        visited: set = set()
-
-        def visit(name: str, stack: set) -> None:
-            if name in visited:
-                return
-            if name in stack:
-                raise ValueError(f"Circular dependency detected: {name}")
-            stack.add(name)
-            plugin = self._plugins.get(name)
-            if plugin is None:
-                raise KeyError(f"Dependency not found: {name}")
-            for dep in plugin.dependencies:
-                visit(dep, stack)
-            stack.discard(name)
-            visited.add(name)
-            ordered.append(name)
-
-        for name in self._plugins:
-            visit(name, set())
-
-        return ordered
-
-
-# ===== 全局单例 =====
-
-_registry: PluginRegistry | None = None
-
 
 def get_plugin_registry() -> PluginRegistry:
-    """获取全局插件注册表单例（懒加载）。"""
-    global _registry
-    if _registry is None:
-        _registry = PluginRegistry()
-    return _registry
-
-
-# ===== @register_plugin 装饰器 =====
-
-def register_plugin(cls: Type[Plugin]) -> Type[Plugin]:
-    """插件注册装饰器。
-
-    用法：
-        @register_plugin
-        class MyPlugin(Plugin):
-            name = "my_plugin"
-            version = "0.1.0"
-
-            async def on_load(self):
-                ...
-    """
-    get_plugin_registry().register(cls)
-    return cls
+    global _registry_instance
+    if _registry_instance is None:
+        _registry_instance = PluginRegistry()
+    return _registry_instance

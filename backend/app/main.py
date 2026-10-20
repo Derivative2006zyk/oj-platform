@@ -73,8 +73,12 @@ async def health():
 # ===== 挂载插件路由 =====
 # 必须在 lifespan 之前执行，让路由在应用创建时注册。
 # 但插件的实例化在 lifespan 中，所以这里先 discover 再挂载。
+# 在 main.py 的末尾挂载部分修改
 _registry = get_plugin_registry()
 _registry.discover("app.plugins")
+
+# 新增：扫描挂载的外部插件目录
+_registry.discover_external("/app/plugins_installed")
 
 # 触发实例化
 _registry._build_instances()
