@@ -45,6 +45,7 @@ services:
       ADMIN_KEY: ${ADMIN_KEY:-admin-key-change-me}
     volumes:
       - ./backend/uploads:/app/uploads
+      - ./backend/plugins_installed:/app/plugins_installed
     depends_on:
       postgres:
         condition: service_healthy
@@ -66,6 +67,7 @@ services:
       - ./backend/uploads:/app/uploads
       - /var/run/docker.sock:/var/run/docker.sock
       - sandbox_data:/sandbox
+      - ./backend/plugins_installed:/app/plugins_installed
     depends_on:
       postgres:
         condition: service_healthy
