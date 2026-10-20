@@ -30,3 +30,6 @@ frontend/android/app/src/main/assets/public/
 frontend/android/app/src/main/assets/capacitor.config.json
 frontend/android/app/src/main/assets/capacitor.plugins.json
 backend/uploads/
+# 外部插件（不提交具体代码，只保留目录结构）
+backend/plugins_installed/*
+!backend/plugins_installed/.gitkeep
