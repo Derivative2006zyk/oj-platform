@@ -12,6 +12,16 @@
             <router-link to="/admin/stats" class="nav-link">统计</router-link>
           </template>
         </template>
+        
+        <!-- 动态插件菜单 -->
+        <router-link
+          v-for="p in pluginStore.plugins"
+          :key="p.name"
+          :to="p.ui_manifest?.route_path || '/plugin/' + p.folder_name"
+          class="nav-link"
+        >
+          {{ p.ui_manifest?.menu_name || p.display_name }}
+        </router-link>
       </nav>
 
       <div class="right-section">
@@ -40,6 +50,14 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
+import { onMounted } from 'vue'
+import { usePluginStore } from '../stores/plugin'
+
+const pluginStore = usePluginStore()
+
+onMounted(() => {
+  pluginStore.fetchPlugins()
+})
 
 const router = useRouter()
 const userStore = useUserStore()

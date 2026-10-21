@@ -24,6 +24,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/Register.vue'),
     meta: { guestOnly: true },
   },
+  // 设置页：允许免登录访问（用于未连接后端时配置 IP）
+  {
+    path: '/settings',
+    name: 'settings',
+    component: () => import('../views/Settings.vue'),
+  },
   {
     path: '/admin/problem/new',
     name: 'problem-create',
@@ -60,12 +66,11 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/AdminStats.vue'),
     meta: { requiresAuth: true, requiresAdmin: true },
   },
-  // 新增设置页（允许免登录访问）
+  // 动态插件占位路由（Day 46 新增）
   {
-    path: '/settings',
-    name: 'settings',
-    component: () => import('../views/Settings.vue'),
-    // 去掉 meta: { requiresAuth: true }
+    path: '/plugin/:name',
+    name: 'plugin-view',
+    component: () => import('../views/PluginView.vue'),
   },
 ]
 

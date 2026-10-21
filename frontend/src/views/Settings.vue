@@ -5,31 +5,6 @@
         <h1>设置</h1>
         <p class="page-desc">配置应用连接与网络</p>
       </header>
-      <!-- 数据管理 -->
-      <section class="card" style="margin-top: var(--spacing-lg);">
-        <div class="card-header">
-          <span>数据备份与恢复</span>
-        </div>
-        <div class="card-body">
-          <p class="hint">导出包含所有题库、账号和上传图片的完整 ZIP 包。恢复操作会覆盖当前所有数据，请谨慎操作。</p>
-          
-          <div class="actions">
-            <button class="btn-primary" @click="onBackup" :disabled="backingUp">
-              {{ backingUp ? '备份中...' : '导出备份' }}
-            </button>
-            <button class="btn-ghost" style="color: var(--color-danger-text); border-color: var(--color-danger-text);" @click="onRestoreClick" :disabled="restoring">
-              {{ restoring ? '恢复中...' : '从备份恢复' }}
-            </button>
-            <input
-              ref="fileInputRef"
-              type="file"
-              accept=".zip"
-              style="display: none;"
-              @change="onRestoreFileChange"
-            />
-          </div>
-        </div>
-      </section>
 
       <section class="card">
         <div class="card-header">
@@ -68,6 +43,56 @@
           </div>
         </div>
       </section>
+
+      <!-- 数据管理 -->
+      <section class="card" style="margin-top: var(--spacing-lg);">
+        <div class="card-header">
+          <span>数据备份与恢复</span>
+        </div>
+        <div class="card-body">
+          <p class="hint">导出包含所有题库、账号和上传图片的完整 ZIP 包。恢复操作会覆盖当前所有数据，请谨慎操作。</p>
+          
+          <div class="actions">
+            <button class="btn-primary" @click="onBackup" :disabled="backingUp">
+              {{ backingUp ? '备份中...' : '导出备份' }}
+            </button>
+            <button class="btn-ghost" style="color: var(--color-danger-text); border-color: var(--color-danger-text);" @click="onRestoreClick" :disabled="restoring">
+              {{ restoring ? '恢复中...' : '从备份恢复' }}
+            </button>
+            <input
+              ref="fileInputRef"
+              type="file"
+              accept=".zip"
+              style="display: none;"
+              @change="onRestoreFileChange"
+            />
+          </div>
+        </div>
+      </section>
+
+      <!-- 插件管理（Day 46 新增） -->
+      <section class="card" style="margin-top: var(--spacing-lg);">
+        <div class="card-header">
+          <span>已安装的扩展插件</span>
+        </div>
+        <div class="card-body">
+          <div v-if="pluginStore.plugins.length === 0" class="empty-text">
+            暂无已安装的外部插件。您可以从 GitHub 或社区下载 .ojplugin 插件包。
+          </div>
+          <div v-else class="plugin-list">
+            <div v-for="p in pluginStore.plugins" :key="p.name" class="plugin-item">
+              <div class="plugin-info">
+                <div class="plugin-title">
+                  {{ p.display_name }} <span class="version">v{{ p.version }}</span>
+                </div>
+                <div class="plugin-desc">{{ p.description }}</div>
+                <div class="plugin-author">作者: {{ p.author }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
     </div>
   </main>
 </template>
@@ -76,8 +101,10 @@
 import { ref, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { getBackendUrl, setBackendUrl, isTauriEnv } from '../utils/backend-url'
+import { usePluginStore } from '../stores/plugin'
 import api from '../utils/axios'
 
+const pluginStore = usePluginStore()
 
 const backingUp = ref(false)
 const restoring = ref(false)
@@ -86,7 +113,6 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 async function onBackup() {
   backingUp.value = true
   try {
-    // 提示：如果提示未授权，需要确保本地保存了 admin_key
     const adminKey = localStorage.getItem('admin_key') || ''
     
     const res = await api.get('/admin/backup/export', {
@@ -94,7 +120,6 @@ async function onBackup() {
       responseType: 'blob'
     })
     
-    // 下载文件
     const url = URL.createObjectURL(res.data)
     const a = document.createElement('a')
     a.href = url
@@ -161,7 +186,6 @@ function saveConfig() {
   setBackendUrl(inputUrl.value)
   currentUrl.value = getBackendUrl()
   alert('保存成功！')
-  // 保存后自动刷新页面，让 axios 重新读取 baseURL，并回到首页/登录页
   window.location.href = '/'
 }
 
@@ -175,7 +199,6 @@ async function testConnection() {
   testResult.value = ''
   
   const base = inputUrl.value.trim().replace(/\/$/, '') || (isTauri ? 'http://127.0.0.1:8000' : '')
-  
   const targetUrl = base ? `${base}/health` : '/health'
   
   try {
@@ -210,6 +233,8 @@ async function testConnection() {
 
 onMounted(async () => {
   loadConfig()
+  pluginStore.fetchPlugins() // 加载已安装的插件列表
+  
   if (isTauri) {
     try {
       lanIp.value = await invoke<string>('get_lan_ip')
@@ -368,5 +393,51 @@ onMounted(async () => {
 .test-result.error {
   background: var(--color-danger-bg);
   color: var(--color-danger-text);
+}
+
+/* ===== 插件列表样式 (Day 46 新增) ===== */
+.empty-text {
+  text-align: center;
+  color: var(--color-text-muted);
+  padding: 20px;
+  font-size: var(--font-size-body);
+}
+
+.plugin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.plugin-item {
+  padding: 12px 16px;
+  background: var(--color-sample-bg);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-light);
+}
+
+.plugin-title {
+  font-weight: bold;
+  font-size: 15px;
+  color: var(--color-text-primary);
+  margin-bottom: 4px;
+}
+
+.version {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-weight: normal;
+  margin-left: 6px;
+}
+
+.plugin-desc {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin-bottom: 6px;
+}
+
+.plugin-author {
+  font-size: 12px;
+  color: var(--color-text-muted);
 }
 </style>
