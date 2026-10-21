@@ -110,6 +110,28 @@ class PluginRegistry:
         for plugin in self._plugins.values():
             routers.extend(plugin.get_routers())
         return routers
+    
+    def get_ui_manifests(self) -> List[dict]:
+        """获取所有外部插件的 UI 配置"""
+        results = []
+        path = Path("/app/plugins_installed")
+        if not path.exists():
+            return results
+            
+        for item in path.iterdir():
+            if item.is_dir():
+                manifest_file = item / "manifest.json"
+                if manifest_file.exists():
+                    try:
+                        import json
+                        with open(manifest_file, "r", encoding="utf-8") as f:
+                            data = json.load(f)
+                            # 补充一个唯一标识
+                            data["folder_name"] = item.name
+                            results.append(data)
+                    except Exception as e:
+                        print(f"[PluginRegistry] Error reading manifest {item.name}: {e}")
+        return results
 
 
 def get_plugin_registry() -> PluginRegistry:

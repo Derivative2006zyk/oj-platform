@@ -86,3 +86,10 @@ _registry._build_instances()
 # 挂载所有插件的路由
 for router in _registry.collect_routers():
     app.include_router(router)
+
+# 在 main.py 的末尾，路由挂载部分
+@app.get("/api/plugins/ui")
+async def get_plugins_ui():
+    """获取用于前端渲染菜单的插件列表"""
+    _registry = get_plugin_registry()
+    return _registry.get_ui_manifests()
