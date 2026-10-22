@@ -4,6 +4,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.event_bus import get_event_bus
 from app.core.plugin_registry import get_plugin_registry
+from fastapi.staticfiles import StaticFiles
+import os
 
 
 @asynccontextmanager
@@ -93,3 +95,18 @@ async def get_plugins_ui():
     """获取用于前端渲染菜单的插件列表"""
     _registry = get_plugin_registry()
     return _registry.get_ui_manifests()
+
+# ===== 挂载插件路由 =====
+_registry = get_plugin_registry()
+_registry.discover("app.plugins")
+_registry.discover_external("/app/plugins_installed")
+_registry._build_instances()
+
+for router in _registry.collect_routers():
+    app.include_router(router)
+
+# ===== 挂载外部插件的前端静态文件 =====
+# 允许前端通过 /plugins_static/插件名/frontend/index.html 访问
+plugins_static_dir = "/app/plugins_installed"
+if os.path.exists(plugins_static_dir):
+    app.mount("/plugins_static", StaticFiles(directory=plugins_static_dir), name="plugins_static")
