@@ -11,6 +11,11 @@ export default defineConfig({
         changeOrigin: true,
         ws: true,
       },
+      // 新增代理配置
+      '/plugins_static': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
     },
   },
   preview: {
@@ -21,12 +26,17 @@ export default defineConfig({
         changeOrigin: true,
         ws: true,
       },
+      // 新增代理配置
+      '/plugins_static': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
     },
   },
   optimizeDeps: {
     include: ['monaco-editor'],
   },
-    build: {
+  build: {
     rollupOptions: {
       output: {
         manualChunks(id: string) {

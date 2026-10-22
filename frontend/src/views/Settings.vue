@@ -6,6 +6,7 @@
         <p class="page-desc">配置应用连接与网络</p>
       </header>
 
+      <!-- ===== 后端连接 ===== -->
       <section class="card">
         <div class="card-header">
           <span>后端连接地址</span>
@@ -44,19 +45,26 @@
         </div>
       </section>
 
-      <!-- 数据管理 -->
+      <!-- ===== 数据备份与恢复 ===== -->
       <section class="card" style="margin-top: var(--spacing-lg);">
         <div class="card-header">
           <span>数据备份与恢复</span>
         </div>
         <div class="card-body">
-          <p class="hint">导出包含所有题库、账号和上传图片的完整 ZIP 包。恢复操作会覆盖当前所有数据，请谨慎操作。</p>
+          <p class="hint">
+            导出包含所有题库、账号和上传图片的完整 ZIP 包。恢复操作会覆盖当前所有数据，请谨慎操作。
+          </p>
           
           <div class="actions">
             <button class="btn-primary" @click="onBackup" :disabled="backingUp">
               {{ backingUp ? '备份中...' : '导出备份' }}
             </button>
-            <button class="btn-ghost" style="color: var(--color-danger-text); border-color: var(--color-danger-text);" @click="onRestoreClick" :disabled="restoring">
+            <button 
+              class="btn-ghost" 
+              style="color: var(--color-danger-text); border-color: var(--color-danger-text);" 
+              @click="onRestoreClick" 
+              :disabled="restoring"
+            >
               {{ restoring ? '恢复中...' : '从备份恢复' }}
             </button>
             <input
@@ -70,14 +78,14 @@
         </div>
       </section>
 
-      <!-- 插件管理（Day 46 新增） -->
+      <!-- ===== 已安装插件 ===== -->
       <section class="card" style="margin-top: var(--spacing-lg);">
         <div class="card-header">
           <span>已安装的扩展插件</span>
         </div>
         <div class="card-body">
           <div v-if="pluginStore.plugins.length === 0" class="empty-text">
-            暂无已安装的外部插件。您可以从 GitHub 或社区下载 .ojplugin 插件包。
+            暂无已安装的外部插件。
           </div>
           <div v-else class="plugin-list">
             <div v-for="p in pluginStore.plugins" :key="p.name" class="plugin-item">
@@ -89,6 +97,25 @@
                 <div class="plugin-author">作者: {{ p.author }}</div>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== 插件市场 ===== -->
+      <section class="card" style="margin-top: var(--spacing-lg);">
+        <div class="card-header">
+          <span>插件市场</span>
+        </div>
+        <div class="card-body">
+          <div class="plugin-item">
+            <div class="plugin-info">
+              <div class="plugin-title">示例插件 (Hello World)</div>
+              <div class="plugin-desc">这是一个演示用的插件，安装后会在导航栏多出一个菜单。</div>
+              <div class="plugin-author">作者: OJ Team | v0.1.0</div>
+            </div>
+            <button class="btn-primary install-btn" @click="onInstallTest" :disabled="installing">
+              {{ installing ? '安装中...' : '一键安装' }}
+            </button>
           </div>
         </div>
       </section>
@@ -110,11 +137,11 @@ const backingUp = ref(false)
 const restoring = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 
+// ===== 备份与恢复 =====
 async function onBackup() {
   backingUp.value = true
   try {
     const adminKey = localStorage.getItem('admin_key') || ''
-    
     const res = await api.get('/admin/backup/export', {
       headers: { 'X-Admin-Key': adminKey },
       responseType: 'blob'
@@ -168,6 +195,7 @@ async function onRestoreFileChange(e: Event) {
   }
 }
 
+// ===== 网络连接配置 =====
 const currentUrl = ref('')
 const inputUrl = ref('')
 const isTauri = isTauriEnv()
@@ -231,9 +259,32 @@ async function testConnection() {
   }
 }
 
+// ===== 插件市场安装 =====
+const installing = ref(false)
+
+async function onInstallTest() {
+  if (!confirm('确定要安装该插件吗？安装完成后需要重启后端。')) return
+  installing.value = true
+  try {
+    const adminKey = localStorage.getItem('admin_key') || ''
+    // 测试用的本地服务器地址
+    const downloadUrl = "http://host.docker.internal:9000/hello_world.zip"
+    
+    const res = await api.post('/admin/market/install', 
+      { download_url: downloadUrl },
+      { headers: { 'X-Admin-Key': adminKey } }
+    )
+    alert(res.data.message)
+  } catch (e: any) {
+    alert('安装失败：' + (e.response?.data?.detail || e.message))
+  } finally {
+    installing.value = false
+  }
+}
+
 onMounted(async () => {
   loadConfig()
-  pluginStore.fetchPlugins() // 加载已安装的插件列表
+  pluginStore.fetchPlugins()
   
   if (isTauri) {
     try {
@@ -273,6 +324,7 @@ onMounted(async () => {
   font-size: var(--font-size-small);
 }
 
+/* ===== 卡片基础 ===== */
 .card {
   background: var(--color-bg-card);
   border-radius: var(--radius-lg);
@@ -303,6 +355,7 @@ onMounted(async () => {
   border-radius: 4px;
 }
 
+/* ===== 表单与按钮 ===== */
 .lan-tip {
   background: var(--color-primary-light);
   color: var(--color-primary);
@@ -349,7 +402,8 @@ onMounted(async () => {
   gap: var(--spacing-sm);
 }
 
-.btn-primary, .btn-ghost {
+.btn-primary, 
+.btn-ghost {
   padding: 10px 20px;
   border-radius: var(--radius-md);
   font-size: var(--font-size-body);
@@ -378,6 +432,7 @@ onMounted(async () => {
   color: var(--color-primary);
 }
 
+/* ===== 状态提示 ===== */
 .test-result {
   margin-top: var(--spacing-md);
   padding: 10px 14px;
@@ -395,7 +450,7 @@ onMounted(async () => {
   color: var(--color-danger-text);
 }
 
-/* ===== 插件列表样式 (Day 46 新增) ===== */
+/* ===== 插件列表与市场 ===== */
 .empty-text {
   text-align: center;
   color: var(--color-text-muted);
@@ -414,6 +469,13 @@ onMounted(async () => {
   background: var(--color-sample-bg);
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border-light);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.plugin-info {
+  flex: 1;
 }
 
 .plugin-title {
@@ -439,5 +501,10 @@ onMounted(async () => {
 .plugin-author {
   font-size: 12px;
   color: var(--color-text-muted);
+}
+
+.install-btn {
+  margin-left: auto;
+  flex-shrink: 0;
 }
 </style>

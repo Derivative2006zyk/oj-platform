@@ -1,18 +1,23 @@
 <template>
   <main class="plugin-page">
     <div class="container">
-      <header class="page-header">
-        <h1>插件页面: {{ pluginName }}</h1>
-      </header>
-      <section class="card">
-        <div class="card-body">
-          <p>此处用于渲染动态加载的插件前端内容。</p>
-          <p v-if="pluginInfo">
-            插件作者: {{ pluginInfo.author }} | 版本: {{ pluginInfo.version }}
-          </p>
-          <p v-else>未找到该插件的详细信息。</p>
+      <div class="plugin-header">
+        <h1>插件: {{ pluginInfo?.display_name || pluginName }}</h1>
+        <span class="version">v{{ pluginInfo?.version }}</span>
+        <a :href="iframeUrl" target="_blank" class="open-new">在新窗口打开</a>
+      </div>
+      
+      <div class="iframe-container">
+        <iframe 
+          v-if="iframeUrl" 
+          :src="iframeUrl" 
+          frameborder="0"
+          class="plugin-iframe"
+        ></iframe>
+        <div v-else class="empty">
+          该插件未提供前端页面
         </div>
-      </section>
+      </div>
     </div>
   </main>
 </template>
@@ -21,6 +26,7 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { usePluginStore } from '../stores/plugin'
+import { getBackendUrl } from '../utils/backend-url'
 
 const route = useRoute()
 const pluginStore = usePluginStore()
@@ -29,30 +35,65 @@ const pluginName = computed(() => route.params.name as string)
 const pluginInfo = computed(() => 
   pluginStore.plugins.find(p => p.folder_name === pluginName.value)
 )
+
+const iframeUrl = computed(() => {
+  const base = getBackendUrl()
+  // 如果 base 存在，使用绝对路径；如果为空，在开发环境下使用相对路径
+  const prefix = base || ''
+  return `${prefix}/plugins_static/${pluginName.value}/frontend/index.html`
+})
 </script>
 
 <style scoped>
 .plugin-page {
-  padding: var(--spacing-xl) 0;
+  padding: var(--spacing-lg) 0;
+  height: calc(100vh - 56px);
+  display: flex;
+  flex-direction: column;
 }
 .container {
-  max-width: 960px;
+  max-width: 1200px;
+  width: 100%;
   margin: 0 auto;
   padding: 0 var(--spacing-lg);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
-.page-header {
-  margin-bottom: var(--spacing-lg);
+.plugin-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
 }
-.page-header h1 {
+.plugin-header h1 {
   font-size: var(--font-size-title);
   margin: 0;
 }
-.card {
+.version {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+}
+.open-new {
+  margin-left: auto;
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+.iframe-container {
+  flex: 1;
   background: var(--color-bg-card);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
+  overflow: hidden;
+  display: flex;
 }
-.card-body {
-  padding: var(--spacing-lg);
+.plugin-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+.empty {
+  margin: auto;
+  color: var(--color-text-muted);
 }
 </style>
