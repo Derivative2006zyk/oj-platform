@@ -94,6 +94,7 @@ fn main() {
             update_tray_tooltip,
             refresh_tray_from_backend,
             get_lan_ip,
+            restart_backend_cmd,
         ])
         .setup(|app| {
             build_tray(app)?;
@@ -282,4 +283,10 @@ fn get_lan_ip() -> Result<String, String> {
         Ok(ip) => Ok(format!("http://{}:8000", ip)),
         Err(_) => Err("无法获取局域网 IP".to_string()),
     }
+}
+
+/// 重启后端服务（用于安装插件后）
+#[tauri::command]
+fn restart_backend_cmd() -> Result<(), String> {
+    crate::backend_launcher::restart_backend()
 }

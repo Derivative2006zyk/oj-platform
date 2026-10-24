@@ -350,3 +350,45 @@ pub fn ensure_backend_ready() -> Result<(), String> {
 
     Ok(())
 }
+
+// ===== 重启后端服务 =====
+pub fn restart_backend() -> Result<(), String> {
+    let root = app_data_dir();
+    println!("[launcher] restarting backend containers in {:?}", root);
+
+    let candidates = collect_candidates();
+    let mut found_cmd = None;
+
+    for cand in candidates {
+        if let Ok(out) = run_cmd(&cand, &["--version"]) {
+            if out.status.success() {
+                found_cmd = Some(cand);
+                break;
+            }
+        }
+    }
+
+    let cmd = match found_cmd {
+        Some(c) => c,
+        None => return Err("未找到可用的 Docker 命令".to_string()),
+    };
+
+    // 执行 docker compose restart backend worker
+    let mut c = cmd.build();
+    c.args(["compose", "restart", "backend", "worker"])
+        .current_dir(&root);
+
+    let output = c.output().map_err(|e| format!("执行重启失败: {}", e))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("重启容器失败: {}", stderr));
+    }
+
+    println!("[launcher] containers restarted, waiting for backend...");
+    
+    // 等待后端端口就绪
+    wait_for_backend()?;
+    
+    println!("[launcher] backend is ready after restart");
+    Ok(())
+}
