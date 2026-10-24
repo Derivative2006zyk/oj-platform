@@ -22,7 +22,8 @@ export const usePluginStore = defineStore('plugin', () => {
 
   async function fetchPlugins() {
     try {
-      const res = await api.get<PluginManifest[]>('/plugins/ui')
+      // 加时间戳，强制浏览器每次都向服务器请求最新数据
+      const res = await api.get<PluginManifest[]>('/plugins/ui?_t=' + Date.now())
       plugins.value = res.data
     } catch (e) {
       console.error('获取插件列表失败', e)

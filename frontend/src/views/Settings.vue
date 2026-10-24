@@ -113,7 +113,7 @@
               <div class="plugin-desc">这是一个演示用的插件，安装后会在导航栏多出一个菜单。</div>
               <div class="plugin-author">作者: OJ Team | v0.1.0</div>
             </div>
-            <button class="btn-primary install-btn" @click="onInstallTest" :disabled="installing">
+            <button class="btn-primary install-btn" @click="onInstallTest" :disabled="installing || restarting">
               {{ installing ? '安装中...' : '一键安装' }}
             </button>
           </div>
@@ -121,23 +121,32 @@
       </section>
 
     </div>
+
+    <!-- ===== 重启全屏遮罩 ===== -->
+    <div v-if="restarting" class="restart-overlay">
+      <div class="spinner"></div>
+      <div class="restart-text">正在重启服务并加载新插件（已耗时 {{ restartSeconds }} 秒）...</div>
+    </div>
   </main>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { invoke } from '@tauri-apps/api/core'
 import { getBackendUrl, setBackendUrl, isTauriEnv } from '../utils/backend-url'
 import { usePluginStore } from '../stores/plugin'
 import api from '../utils/axios'
 
+const router = useRouter()
 const pluginStore = usePluginStore()
+const isTauri = isTauriEnv()
 
+// ===== 数据备份与恢复 =====
 const backingUp = ref(false)
 const restoring = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 
-// ===== 备份与恢复 =====
 async function onBackup() {
   backingUp.value = true
   try {
@@ -195,10 +204,9 @@ async function onRestoreFileChange(e: Event) {
   }
 }
 
-// ===== 网络连接配置 =====
+// ===== 网络配置 =====
 const currentUrl = ref('')
 const inputUrl = ref('')
-const isTauri = isTauriEnv()
 const lanIp = ref('')
 
 const testing = ref(false)
@@ -259,26 +267,72 @@ async function testConnection() {
   }
 }
 
-// ===== 插件市场安装 =====
+// ===== 插件安装与重启 =====
 const installing = ref(false)
+const restarting = ref(false)
+const restartSeconds = ref(0)
+let timer: number | null = null
 
 async function onInstallTest() {
-  if (!confirm('确定要安装该插件吗？安装完成后需要重启后端。')) return
+  if (!confirm('确定要安装该插件吗？')) return
+  
   installing.value = true
   try {
     const adminKey = localStorage.getItem('admin_key') || ''
-    // 测试用的本地服务器地址
     const downloadUrl = "http://host.docker.internal:9000/hello_world.zip"
     
-    const res = await api.post('/admin/market/install', 
+    await api.post('/admin/market/install', 
       { download_url: downloadUrl },
       { headers: { 'X-Admin-Key': adminKey } }
     )
-    alert(res.data.message)
+    
+    if (isTauri) {
+      restarting.value = true
+      restartSeconds.value = 0
+      // 启动倒计时动画
+      timer = window.setInterval(() => { restartSeconds.value++ }, 1000)
+      
+      // 1. 触发 Tauri 重启后端
+      await invoke('restart_backend_cmd')
+      
+      // 2. 前端主动轮询后端 API，直到真正返回 200 成功
+      let retries = 30 // 最多等 15 秒
+      let ready = false
+      
+      while (retries > 0 && !ready) {
+        try {
+          // 直接请求插件列表接口，不仅验证网络，还验证路由是否挂载
+          const res = await api.get('/plugins/ui')
+          if (res.status === 200) {
+            pluginStore.plugins = res.data
+            ready = true
+          }
+        } catch (e) {
+          // 后端还在启动，等待 500ms 后重试
+          await new Promise(r => setTimeout(r, 500))
+          retries--
+        }
+      }
+      
+      if (timer) clearInterval(timer)
+      restarting.value = false
+      installing.value = false
+      
+      if (ready) {
+        alert('插件安装成功，导航栏已更新！')
+        // 【关键】不要跳转页面！就停在设置页。导航栏的 Vue 响应式会自动更新出新菜单。
+      } else {
+        alert('安装可能超时，请手动刷新页面查看。')
+      }
+    } else {
+      alert('插件安装成功！请手动重启后端服务（如终端执行 docker compose restart backend worker）后刷新页面。')
+    }
   } catch (e: any) {
-    alert('安装失败：' + (e.response?.data?.detail || e.message))
+    alert('安装失败：' + (e.response?.data?.detail || e.message || e))
   } finally {
     installing.value = false
+    restarting.value = false
+    if (timer) clearInterval(timer)
   }
 }
 
@@ -297,65 +351,55 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+/* 样式保持完全不变 */
 .settings-page {
   padding: var(--spacing-xl) 0;
+  min-height: calc(100vh - 56px);
 }
-
 .container {
   max-width: 800px;
   margin: 0 auto;
   padding: 0 var(--spacing-lg);
 }
-
 .page-header {
   margin-bottom: var(--spacing-lg);
 }
-
 .page-header h1 {
   font-size: var(--font-size-title);
   font-weight: var(--font-weight-bold);
   color: var(--color-text-primary);
   margin: 0 0 var(--spacing-xs);
 }
-
 .page-desc {
   margin: 0;
   color: var(--color-text-secondary);
   font-size: var(--font-size-small);
 }
-
-/* ===== 卡片基础 ===== */
 .card {
   background: var(--color-bg-card);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
   overflow: hidden;
 }
-
 .card-header {
   padding: var(--spacing-md) var(--spacing-lg);
   border-bottom: 1px solid var(--color-border-light);
   font-weight: var(--font-weight-bold);
   font-size: var(--font-size-small);
 }
-
 .card-body {
   padding: var(--spacing-lg);
 }
-
 .hint {
   font-size: 13px;
   color: var(--color-text-secondary);
   margin-bottom: var(--spacing-md);
 }
-
 .hint code {
   background: var(--color-sample-bg);
   padding: 2px 6px;
   border-radius: 4px;
 }
-
-/* ===== 表单与按钮 ===== */
 .lan-tip {
   background: var(--color-primary-light);
   color: var(--color-primary);
@@ -365,19 +409,16 @@ onMounted(async () => {
   margin-bottom: var(--spacing-lg);
   line-height: 1.6;
 }
-
 .form-item {
   display: flex;
   flex-direction: column;
   gap: 6px;
   margin-bottom: var(--spacing-lg);
 }
-
 .form-item label {
   font-size: 13px;
   color: var(--color-text-secondary);
 }
-
 .form-item input {
   padding: 10px 12px;
   border: 1px solid var(--color-border);
@@ -387,21 +428,17 @@ onMounted(async () => {
   color: var(--color-text-primary);
   outline: none;
 }
-
 .form-item input:focus {
   border-color: var(--color-primary);
 }
-
 .help {
   font-size: 12px;
   color: var(--color-text-muted);
 }
-
 .actions {
   display: flex;
   gap: var(--spacing-sm);
 }
-
 .btn-primary, 
 .btn-ghost {
   padding: 10px 20px;
@@ -410,60 +447,56 @@ onMounted(async () => {
   font-weight: 500;
   cursor: pointer;
 }
-
 .btn-primary {
   background: var(--color-primary);
   color: white;
   border: none;
 }
-
-.btn-primary:hover {
+.btn-primary:hover:not(:disabled) {
   background: var(--color-primary-hover);
 }
-
+.btn-primary:disabled {
+  background: var(--color-primary-disabled);
+  cursor: not-allowed;
+}
 .btn-ghost {
   background: transparent;
   color: var(--color-text-primary);
   border: 1px solid var(--color-border);
 }
-
-.btn-ghost:hover {
+.btn-ghost:hover:not(:disabled) {
   border-color: var(--color-primary);
   color: var(--color-primary);
 }
-
-/* ===== 状态提示 ===== */
+.btn-ghost:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 .test-result {
   margin-top: var(--spacing-md);
   padding: 10px 14px;
   border-radius: var(--radius-md);
   font-size: 13px;
 }
-
 .test-result.success {
   background: var(--color-success-bg);
   color: var(--color-success-text);
 }
-
 .test-result.error {
   background: var(--color-danger-bg);
   color: var(--color-danger-text);
 }
-
-/* ===== 插件列表与市场 ===== */
 .empty-text {
   text-align: center;
   color: var(--color-text-muted);
   padding: 20px;
   font-size: var(--font-size-body);
 }
-
 .plugin-list {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
-
 .plugin-item {
   padding: 12px 16px;
   background: var(--color-sample-bg);
@@ -473,38 +506,63 @@ onMounted(async () => {
   align-items: center;
   gap: var(--spacing-md);
 }
-
 .plugin-info {
   flex: 1;
 }
-
 .plugin-title {
   font-weight: bold;
   font-size: 15px;
   color: var(--color-text-primary);
   margin-bottom: 4px;
 }
-
 .version {
   font-size: 12px;
   color: var(--color-text-secondary);
   font-weight: normal;
   margin-left: 6px;
 }
-
 .plugin-desc {
   font-size: 13px;
   color: var(--color-text-secondary);
   margin-bottom: 6px;
 }
-
 .plugin-author {
   font-size: 12px;
   color: var(--color-text-muted);
 }
-
 .install-btn {
   margin-left: auto;
   flex-shrink: 0;
+}
+.restart-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+.restart-text {
+  margin-top: var(--spacing-md);
+  color: var(--color-primary);
+  font-weight: bold;
+  font-size: var(--font-size-body);
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

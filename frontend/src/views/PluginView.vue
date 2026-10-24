@@ -8,12 +8,22 @@
       </div>
       
       <div class="iframe-container">
+        <!-- 加载遮罩 -->
+        <div v-if="loading" class="loading-mask">
+          <div class="spinner"></div>
+          <div>正在加载插件页面...</div>
+        </div>
+
         <iframe 
           v-if="iframeUrl" 
+          :key="pluginName"
           :src="iframeUrl" 
           frameborder="0"
+          sandbox="allow-scripts allow-same-origin allow-modals allow-forms"
           class="plugin-iframe"
+          @load="onIframeLoad"
         ></iframe>
+        
         <div v-else class="empty">
           该插件未提供前端页面
         </div>
@@ -23,13 +33,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { usePluginStore } from '../stores/plugin'
 import { getBackendUrl } from '../utils/backend-url'
 
 const route = useRoute()
 const pluginStore = usePluginStore()
+
+const loading = ref(true)
 
 const pluginName = computed(() => route.params.name as string)
 const pluginInfo = computed(() => 
@@ -38,9 +50,17 @@ const pluginInfo = computed(() =>
 
 const iframeUrl = computed(() => {
   const base = getBackendUrl()
-  // 如果 base 存在，使用绝对路径；如果为空，在开发环境下使用相对路径
   const prefix = base || ''
   return `${prefix}/plugins_static/${pluginName.value}/frontend/index.html`
+})
+
+function onIframeLoad() {
+  loading.value = false
+}
+
+// 路由参数变化时，重置加载状态
+watch(() => route.params.name, () => {
+  loading.value = true
 })
 </script>
 
@@ -51,6 +71,7 @@ const iframeUrl = computed(() => {
   display: flex;
   flex-direction: column;
 }
+
 .container {
   max-width: 1200px;
   width: 100%;
@@ -60,25 +81,30 @@ const iframeUrl = computed(() => {
   display: flex;
   flex-direction: column;
 }
+
 .plugin-header {
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
   margin-bottom: var(--spacing-md);
 }
+
 .plugin-header h1 {
   font-size: var(--font-size-title);
   margin: 0;
 }
+
 .version {
   color: var(--color-text-secondary);
   font-size: 14px;
 }
+
 .open-new {
   margin-left: auto;
   color: var(--color-primary);
   text-decoration: underline;
 }
+
 .iframe-container {
   flex: 1;
   background: var(--color-bg-card);
@@ -86,14 +112,44 @@ const iframeUrl = computed(() => {
   box-shadow: var(--shadow-card);
   overflow: hidden;
   display: flex;
+  position: relative;
 }
+
 .plugin-iframe {
   width: 100%;
   height: 100%;
   border: none;
 }
+
 .empty {
   margin: auto;
   color: var(--color-text-muted);
+}
+
+/* 加载遮罩 */
+.loading-mask {
+  position: absolute;
+  inset: 0;
+  background: var(--color-bg-card);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--color-text-secondary);
+  z-index: 10;
+}
+
+.spinner {
+  width: 30px;
+  height: 30px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 </style>
