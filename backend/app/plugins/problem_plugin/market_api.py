@@ -9,7 +9,7 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from app.core.security import verify_admin_key
+from app.core.security import require_admin
 
 router = APIRouter(prefix="/api", tags=["market"])
 
@@ -21,7 +21,7 @@ class InstallRequest(BaseModel):
 @router.post("/admin/market/install")
 async def install_plugin(
     req: InstallRequest,
-    _: str = Depends(verify_admin_key)
+    _: str = Depends(require_admin)  # 校验 JWT 中的 role == 'admin'
 ):
     """从指定 URL 下载并安装 .ojplugin (ZIP) 插件"""
     url = req.download_url
