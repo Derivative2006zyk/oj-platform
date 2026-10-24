@@ -11,7 +11,7 @@ export default defineConfig({
         changeOrigin: true,
         ws: true,
       },
-      // 新增代理配置
+      // 新增：代理插件静态文件请求
       '/plugins_static': {
         target: 'http://localhost:8000',
         changeOrigin: true,
@@ -26,7 +26,6 @@ export default defineConfig({
         changeOrigin: true,
         ws: true,
       },
-      // 新增代理配置
       '/plugins_static': {
         target: 'http://localhost:8000',
         changeOrigin: true,
