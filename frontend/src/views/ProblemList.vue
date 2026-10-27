@@ -78,6 +78,7 @@
         </select>
         <button class="btn-primary" @click="search">搜索</button>
         <button class="btn-ghost" @click="goCreate">录入题目</button>
+        <button class="btn-ghost" @click="showOcrModal = true">拍照录题</button>
         <button
           class="btn-ghost"
           :disabled="exporting"
@@ -273,10 +274,17 @@
         </footer>
       </div>
     </div>
+    <!-- 拍照录题弹窗 -->
+    <OcrUploader 
+      :visible="showOcrModal" 
+      @close="showOcrModal = false" 
+      @success="loadProblems" 
+    />
   </div>
 </template>
 
 <script setup lang="ts">
+import OcrUploader from '../components/OcrUploader.vue'
 import { ref, reactive, computed, onMounted, watch, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import {
@@ -297,6 +305,7 @@ import {
 import { useUserStore } from '../stores/user'
 import { deleteProblem } from '../api/problem' // 注意路径，确保 api 文件夹下有这个方法
 
+const showOcrModal = ref(false)
 const userStore = useUserStore()
 
 const router = useRouter()
