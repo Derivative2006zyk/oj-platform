@@ -95,3 +95,26 @@ async def install_plugin(
         "message": f"插件 {plugin_name} 安装成功，请重启应用以加载新插件。",
         "need_restart": True
     }
+
+@router.get("/market/plugins")
+async def get_market_plugins():
+    """获取插件市场列表（目前为模拟数据）"""
+    # 后续可以改为：从 GitHub 拉取 market.json
+    return [
+        {
+            "name": "hello_world",
+            "display_name": "Hello World 演示插件",
+            "version": "0.1.0",
+            "author": "OJ Team",
+            "description": "这是一个用来测试插件系统的演示插件，安装后会在导航栏多出一个示例页面。",
+            "download_url": "http://host.docker.internal:9000/hello_world.zip"
+        },
+        {
+            "name": "dark_theme",
+            "display_name": "暗色主题 (开发中)",
+            "version": "0.0.1",
+            "author": "OJ Team",
+            "description": "为系统提供深色模式支持。",
+            "download_url": ""
+        }
+    ]
