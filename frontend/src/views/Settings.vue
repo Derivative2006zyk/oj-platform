@@ -107,19 +107,32 @@
           <span>插件市场</span>
         </div>
         <div class="card-body">
-          <div class="plugin-item">
-            <div class="plugin-info">
-              <div class="plugin-title">示例插件 (Hello World)</div>
-              <div class="plugin-desc">这是一个演示用的插件，安装后会在导航栏多出一个菜单。</div>
-              <div class="plugin-author">作者: OJ Team | v0.1.0</div>
+          <div v-if="marketLoading" class="empty-text">
+            正在获取市场列表...
+          </div>
+          <div v-else-if="marketPlugins.length === 0" class="empty-text">
+            暂无可用插件。
+          </div>
+          <div v-else class="plugin-list">
+            <div v-for="p in marketPlugins" :key="p.name" class="plugin-item">
+              <div class="plugin-info">
+                <div class="plugin-title">
+                  {{ p.display_name }} <span class="version">v{{ p.version }}</span>
+                </div>
+                <div class="plugin-desc">{{ p.description }}</div>
+                <div class="plugin-author">作者: {{ p.author }}</div>
+              </div>
+              <button 
+                class="btn-primary install-btn" 
+                @click="onInstallPlugin(p)"
+                :disabled="installing || restarting || !p.download_url"
+              >
+                {{ installing ? '安装中...' : (p.download_url ? '一键安装' : '敬请期待') }}
+              </button>
             </div>
-            <button class="btn-primary install-btn" @click="onInstallTest" :disabled="installing || restarting">
-              {{ installing ? '安装中...' : '一键安装' }}
-            </button>
           </div>
         </div>
       </section>
-
     </div>
 
     <!-- ===== 重启全屏遮罩 ===== -->
@@ -267,48 +280,60 @@ async function testConnection() {
   }
 }
 
+// ===== 插件市场 =====
+const marketLoading = ref(true)
+const marketPlugins = ref<any[]>([])
+
+async function fetchMarket() {
+  marketLoading.value = true
+  try {
+    const res = await api.get('/market/plugins')
+    marketPlugins.value = res.data
+  } catch (e) {
+    console.error('获取市场列表失败', e)
+  } finally {
+    marketLoading.value = false
+  }
+}
+
 // ===== 插件安装与重启 =====
 const installing = ref(false)
 const restarting = ref(false)
 const restartSeconds = ref(0)
 let timer: number | null = null
 
-async function onInstallTest() {
-  if (!confirm('确定要安装该插件吗？')) return
+async function onInstallPlugin(plugin: any) {
+  if (!plugin.download_url) return
+  if (!confirm(`确定要安装 ${plugin.display_name} 吗？`)) return
   
   installing.value = true
   try {
     const adminKey = localStorage.getItem('admin_key') || ''
-    const downloadUrl = "http://host.docker.internal:9000/hello_world.zip"
     
+    // 动态使用市场返回的 URL
     await api.post('/admin/market/install', 
-      { download_url: downloadUrl },
+      { download_url: plugin.download_url },
       { headers: { 'X-Admin-Key': adminKey } }
     )
     
     if (isTauri) {
       restarting.value = true
       restartSeconds.value = 0
-      // 启动倒计时动画
       timer = window.setInterval(() => { restartSeconds.value++ }, 1000)
       
-      // 1. 触发 Tauri 重启后端
       await invoke('restart_backend_cmd')
       
-      // 2. 前端主动轮询后端 API，直到真正返回 200 成功
-      let retries = 30 // 最多等 15 秒
+      let retries = 30
       let ready = false
       
       while (retries > 0 && !ready) {
         try {
-          // 直接请求插件列表接口，不仅验证网络，还验证路由是否挂载
           const res = await api.get('/plugins/ui')
           if (res.status === 200) {
             pluginStore.plugins = res.data
             ready = true
           }
         } catch (e) {
-          // 后端还在启动，等待 500ms 后重试
           await new Promise(r => setTimeout(r, 500))
           retries--
         }
@@ -320,12 +345,11 @@ async function onInstallTest() {
       
       if (ready) {
         alert('插件安装成功，导航栏已更新！')
-        // 【关键】不要跳转页面！就停在设置页。导航栏的 Vue 响应式会自动更新出新菜单。
       } else {
         alert('安装可能超时，请手动刷新页面查看。')
       }
     } else {
-      alert('插件安装成功！请手动重启后端服务（如终端执行 docker compose restart backend worker）后刷新页面。')
+      alert('插件安装成功！请手动重启后端服务后刷新页面。')
     }
   } catch (e: any) {
     alert('安装失败：' + (e.response?.data?.detail || e.message || e))
@@ -339,6 +363,7 @@ async function onInstallTest() {
 onMounted(async () => {
   loadConfig()
   pluginStore.fetchPlugins()
+  fetchMarket() // 新增：拉取市场列表
   
   if (isTauri) {
     try {
