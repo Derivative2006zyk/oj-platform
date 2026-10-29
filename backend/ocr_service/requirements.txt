@@ -1,7 +1,12 @@
 fastapi==0.115.0
 uvicorn==0.30.6
 python-multipart==0.0.9
-paddlepaddle==2.6.2
+numpy==1.24.4
+transformers==4.40.1
+paddlepaddle-gpu==2.6.2
 paddleocr==2.8.1
-opencv-python-headless==4.9.0.80
-numpy==1.23.5
+pix2tex==0.1.4
+opencv-contrib-python==4.8.0.76
+opencv-python-headless==4.8.0.76
+x-transformers==0.15.0
+timm==0.5.4
