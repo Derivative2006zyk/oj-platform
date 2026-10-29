@@ -9,17 +9,20 @@
       <div class="modal-body">
         <!-- 第一步：上传图片 -->
         <div v-if="step === 'upload'" class="upload-area">
-          <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            style="display: none"
-            ref="fileInputRef"
-            @change="onFileSelected"
-          />
+          <div class="form-group" style="margin-bottom: 20px;">
+            <label style="display:block; margin-bottom:8px; font-weight:bold;">请选择题型</label>
+            <select v-model="selectedType" style="width:100%; padding:10px; border-radius:6px; border:1px solid #ddd;">
+              <option value="algorithm">算法题</option>
+              <option value="choice">选择题</option>
+              <option value="fill_blank">填空题</option>
+              <option value="proof">证明题</option>
+            </select>
+          </div>
+          
+          <input type="file" accept="image/*" capture="environment" style="display: none" ref="fileInputRef" @change="onFileSelected" />
           <div class="upload-box" @click="fileInputRef?.click()">
             <p>点击此处拍照或选择图片</p>
-            <small>支持一图多题，AI 将自动切分</small>
+            <small>支持一图多题，公式自动转 LaTeX</small>
           </div>
         </div>
 
@@ -79,23 +82,25 @@ function close() {
   selectedIds.value = []
   emit('close')
 }
+const selectedType = ref('algorithm') // 新增
 
 async function onFileSelected(e: Event) {
   const input = e.target as HTMLInputElement
   if (!input.files || input.files.length === 0) return
   const file = input.files[0]
-  input.value = '' // 允许重复选同一张图
+  input.value = ''
 
   step.value = 'parsing'
   const formData = new FormData()
   formData.append('file', file)
 
   try {
-    const res = await api.post('/plugins/ocr/parse', formData, {
+    // 把题型传给后端
+    const res = await api.post(`/plugins/ocr/parse?type=${selectedType.value}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
     parsedProblems.value = res.data
-    selectedIds.value = res.data.map((p: any) => p.temp_id) // 默认全选
+    selectedIds.value = res.data.map((p: any) => p.temp_id)
     step.value = 'preview'
   } catch (err: any) {
     alert('识别失败：' + (err.response?.data?.detail || err.message))
