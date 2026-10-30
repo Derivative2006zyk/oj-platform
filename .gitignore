@@ -34,4 +34,4 @@ backend/uploads/
 backend/plugins_installed/*
 !backend/plugins_installed/.gitkeep
 
-docker-compose-linux
+docker-compose-linuxbuild/
