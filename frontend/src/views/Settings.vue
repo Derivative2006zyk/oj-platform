@@ -152,13 +152,11 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 import { invoke } from '@tauri-apps/api/core'
 import { getBackendUrl, setBackendUrl, isTauriEnv } from '../utils/backend-url'
 import { usePluginStore } from '../stores/plugin'
 import api from '../utils/axios'
 
-const router = useRouter()
 const pluginStore = usePluginStore()
 const isTauri = isTauriEnv()
 
@@ -317,7 +315,6 @@ async function onInstallPlugin(plugin: any) {
   try {
     const adminKey = localStorage.getItem('admin_key') || ''
 
-    // 动态使用市场返回的 URL
     await api.post('/admin/market/install',
       { download_url: plugin.download_url },
       { headers: { 'X-Admin-Key': adminKey } }
@@ -367,15 +364,14 @@ async function onInstallPlugin(plugin: any) {
   }
 }
 
-// ===== 插件卸载（Day 52 新增） =====
+// ===== 插件卸载 =====
 const uninstalling = ref(false)
 
 async function onUninstallPlugin(p: any) {
   const folderName = p.folder_name || p.name
-  if (!confirm(`确定要卸载 ${p.display_name || p.name} 吗？\n\n这会销毁插件的微服务容器（Docker 镜像保留，下次安装可秒启动）。`)) {
+  if (!confirm(`确定要卸载 ${p.display_name || p.name} 吗？\n\n这会销毁插件的微服务容器（Docker 镜像保留）。`)) {
     return
   }
-
   uninstalling.value = true
   try {
     const adminKey = localStorage.getItem('admin_key') || ''
@@ -383,7 +379,6 @@ async function onUninstallPlugin(p: any) {
       headers: { 'X-Admin-Key': adminKey }
     })
     alert('插件已卸载，页面将刷新。')
-    // 卸载后建议刷新页面，让导航栏菜单消失
     window.location.reload()
   } catch (e: any) {
     alert('卸载失败：' + (e.response?.data?.detail || e.message || e))
@@ -395,7 +390,7 @@ async function onUninstallPlugin(p: any) {
 onMounted(async () => {
   loadConfig()
   pluginStore.fetchPlugins()
-  fetchMarket() // 拉取市场列表
+  fetchMarket()
 
   if (isTauri) {
     try {
@@ -408,7 +403,6 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-/* 样式保持完全不变 */
 .settings-page {
   padding: var(--spacing-xl) 0;
   min-height: calc(100vh - 56px);
@@ -591,7 +585,6 @@ onMounted(async () => {
   margin-left: auto;
   flex-shrink: 0;
 }
-/* Day 52 新增：卸载按钮样式 */
 .uninstall-btn {
   margin-left: auto;
   flex-shrink: 0;

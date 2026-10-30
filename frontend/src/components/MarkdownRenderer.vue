@@ -13,11 +13,10 @@ const containerRef = ref<HTMLElement | null>(null)
 // 暴力清洗公式，过滤掉括号不匹配的垃圾公式
 function sanitizeMath(text: string): string {
   if (!text) return text
-  return text.replace(/\$\$([\s\S]*?)\$\$/g, (match, formula) => {
+  return text.replace(/\$\$([\s\S]*?)\$\$/g, (match: string, formula: string) => {
     const left = (formula.match(/\{/g) || []).length
     const right = (formula.match(/\}/g) || []).length
     if (left !== right) {
-      // 不匹配，去掉了 $、{ 和 }，防止报错
       return formula.replace(/[\$\{\}]/g, '')
     }
     return match
@@ -40,25 +39,25 @@ const rendered = computed(() => {
 
   // 3. 核心：把 $$ 和 $ 保护起来，不让 marked 破坏它们
   const mathBlocks: string[] = []
-  content = content.replace(/\$\$([\s\S]*?)\$\$/g, (match) => {
+  content = content.replace(/\$\$([\s\S]*?)\$\$/g, (match: string) => {
     const id = `@@BLOCK_MATH_${mathBlocks.length}@@`
     mathBlocks.push(match)
     return id
   })
   
   const mathInlines: string[] = []
-  content = content.replace(/\$([^\$\n]+?)\$/g, (match) => {
+  content = content.replace(/\$([^\$\n]+?)\$/g, (match: string) => {
     const id = `@@INLINE_MATH_${mathInlines.length}@@`
     mathInlines.push(match)
     return id
   })
 
-  // 4. marked 解析
-  let html = marked(content)
+  // 4. marked 解析 (强制断言为 string)
+  let html = marked(content) as string
 
-  // 5. 替换回原公式（此时它们已经安全地呆在 HTML 中）
-  html = html.replace(/@@BLOCK_MATH_(\d+)@@/g, (_, idx) => mathBlocks[Number(idx)])
-  html = html.replace(/@@INLINE_MATH_(\d+)@@/g, (_, idx) => mathInlines[Number(idx)])
+  // 5. 替换回原公式（显式标注参数类型）
+  html = html.replace(/@@BLOCK_MATH_(\d+)@@/g, (_match: string, idx: string) => mathBlocks[Number(idx)])
+  html = html.replace(/@@INLINE_MATH_(\d+)@@/g, (_match: string, idx: string) => mathInlines[Number(idx)])
 
   return html
 })

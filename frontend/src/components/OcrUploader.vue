@@ -19,7 +19,14 @@
             </select>
           </div>
           
-          <input type="file" accept="image/*" capture="environment" style="display: none" ref="fileInputRef" @change="onFileSelected" />
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            style="display: none"
+            ref="fileInputRef"
+            @change="onFileSelected"
+          />
           <div class="upload-box" @click="fileInputRef?.click()">
             <p>点击此处拍照或选择图片</p>
             <small>支持一图多题，公式自动转 LaTeX</small>
@@ -36,7 +43,8 @@
         <div v-else-if="step === 'preview'" class="preview-area">
           <p class="hint">已识别出 {{ parsedProblems.length }} 道题目，请勾选需要导入的题：</p>
           <div class="problem-list">
-            <label v-for="(p, idx) in parsedProblems" :key="p.temp_id" class="problem-item">
+            <!-- 修复了这里未使用的 idx -->
+            <label v-for="p in parsedProblems" :key="p.temp_id" class="problem-item">
               <input type="checkbox" v-model="selectedIds" :value="p.temp_id" />
               <div class="problem-content">
                 <div class="problem-title">{{ p.title }}</div>
@@ -66,7 +74,7 @@
 import { ref } from 'vue'
 import api from '../utils/axios'
 
-const props = defineProps<{ visible: boolean }>()
+defineProps<{ visible: boolean }>()
 const emit = defineEmits(['close', 'success'])
 
 const step = ref<'upload' | 'parsing' | 'preview'>('upload')
@@ -74,15 +82,15 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 const parsedProblems = ref<any[]>([])
 const selectedIds = ref<string[]>([])
 const importing = ref(false)
+const selectedType = ref('algorithm')
 
 function close() {
-  if (step.value === 'parsing') return // 识别中不允许关闭
+  if (step.value === 'parsing') return
   step.value = 'upload'
   parsedProblems.value = []
   selectedIds.value = []
   emit('close')
 }
-const selectedType = ref('algorithm') // 新增
 
 async function onFileSelected(e: Event) {
   const input = e.target as HTMLInputElement
@@ -95,7 +103,6 @@ async function onFileSelected(e: Event) {
   formData.append('file', file)
 
   try {
-    // 把题型传给后端
     const res = await api.post(`/plugins/ocr/parse?type=${selectedType.value}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
@@ -125,7 +132,6 @@ async function onImport() {
 </script>
 
 <style scoped>
-/* 直接复用系统已有的 modal 样式规范 */
 .modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 100; }
 .modal { background: white; border-radius: var(--radius-lg); width: 100%; max-width: 600px; display: flex; flex-direction: column; max-height: 90vh; }
 .modal-header { display: flex; justify-content: space-between; align-items: center; padding: var(--spacing-md) var(--spacing-lg); border-bottom: 1px solid var(--color-border-light); }
