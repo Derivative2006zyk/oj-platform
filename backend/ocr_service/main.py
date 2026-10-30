@@ -42,6 +42,10 @@ def fix_latex_braces(latex: str) -> str:
 
     return latex
 
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
 @app.post("/ocr")
 async def process_image(file: UploadFile = File(...)):
     if not file.content_type.startswith("image/"):
