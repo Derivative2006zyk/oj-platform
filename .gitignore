@@ -33,3 +33,5 @@ backend/uploads/
 # 外部插件（不提交具体代码，只保留目录结构）
 backend/plugins_installed/*
 !backend/plugins_installed/.gitkeep
+
+docker-compose-linux
