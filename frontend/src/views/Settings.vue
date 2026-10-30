@@ -15,7 +15,7 @@
           <p class="hint">
             当前连接地址：<code>{{ currentUrl || '相对路径 (默认)' }}</code>
           </p>
-          
+
           <div v-if="lanIp && isTauri" class="lan-tip">
             本机局域网地址：<strong>{{ lanIp }}</strong><br>
             (移动端请填入此地址)
@@ -54,15 +54,15 @@
           <p class="hint">
             导出包含所有题库、账号和上传图片的完整 ZIP 包。恢复操作会覆盖当前所有数据，请谨慎操作。
           </p>
-          
+
           <div class="actions">
             <button class="btn-primary" @click="onBackup" :disabled="backingUp">
               {{ backingUp ? '备份中...' : '导出备份' }}
             </button>
-            <button 
-              class="btn-ghost" 
-              style="color: var(--color-danger-text); border-color: var(--color-danger-text);" 
-              @click="onRestoreClick" 
+            <button
+              class="btn-ghost"
+              style="color: var(--color-danger-text); border-color: var(--color-danger-text);"
+              @click="onRestoreClick"
               :disabled="restoring"
             >
               {{ restoring ? '恢复中...' : '从备份恢复' }}
@@ -96,6 +96,13 @@
                 <div class="plugin-desc">{{ p.description }}</div>
                 <div class="plugin-author">作者: {{ p.author }}</div>
               </div>
+              <button
+                class="btn-ghost uninstall-btn"
+                @click="onUninstallPlugin(p)"
+                :disabled="uninstalling"
+              >
+                {{ uninstalling ? '卸载中...' : '卸载' }}
+              </button>
             </div>
           </div>
         </div>
@@ -122,8 +129,8 @@
                 <div class="plugin-desc">{{ p.description }}</div>
                 <div class="plugin-author">作者: {{ p.author }}</div>
               </div>
-              <button 
-                class="btn-primary install-btn" 
+              <button
+                class="btn-primary install-btn"
                 @click="onInstallPlugin(p)"
                 :disabled="installing || restarting || !p.download_url"
               >
@@ -168,7 +175,7 @@ async function onBackup() {
       headers: { 'X-Admin-Key': adminKey },
       responseType: 'blob'
     })
-    
+
     const url = URL.createObjectURL(res.data)
     const a = document.createElement('a')
     a.href = url
@@ -194,15 +201,15 @@ async function onRestoreFileChange(e: Event) {
   const input = e.target as HTMLInputElement
   if (!input.files || input.files.length === 0) return
   const file = input.files[0]
-  
+
   restoring.value = true
   const formData = new FormData()
   formData.append('file', file)
-  
+
   try {
     const adminKey = localStorage.getItem('admin_key') || ''
     await api.post('/admin/backup/import', formData, {
-      headers: { 
+      headers: {
         'X-Admin-Key': adminKey,
         'Content-Type': 'multipart/form-data'
       }
@@ -246,19 +253,19 @@ function resetConfig() {
 async function testConnection() {
   testing.value = true
   testResult.value = ''
-  
+
   const base = inputUrl.value.trim().replace(/\/$/, '') || (isTauri ? 'http://127.0.0.1:8000' : '')
   const targetUrl = base ? `${base}/health` : '/health'
-  
+
   try {
     const start = Date.now()
-    const res = await fetch(targetUrl, { 
+    const res = await fetch(targetUrl, {
       method: 'GET',
       mode: 'cors',
       headers: { 'Accept': 'application/json' }
     })
     const duration = Date.now() - start
-    
+
     if (res.ok) {
       const data = await res.json()
       if (data.status === 'ok') {
@@ -305,27 +312,27 @@ let timer: number | null = null
 async function onInstallPlugin(plugin: any) {
   if (!plugin.download_url) return
   if (!confirm(`确定要安装 ${plugin.display_name} 吗？`)) return
-  
+
   installing.value = true
   try {
     const adminKey = localStorage.getItem('admin_key') || ''
-    
+
     // 动态使用市场返回的 URL
-    await api.post('/admin/market/install', 
+    await api.post('/admin/market/install',
       { download_url: plugin.download_url },
       { headers: { 'X-Admin-Key': adminKey } }
     )
-    
+
     if (isTauri) {
       restarting.value = true
       restartSeconds.value = 0
       timer = window.setInterval(() => { restartSeconds.value++ }, 1000)
-      
+
       await invoke('restart_backend_cmd')
-      
+
       let retries = 30
       let ready = false
-      
+
       while (retries > 0 && !ready) {
         try {
           const res = await api.get('/plugins/ui')
@@ -338,11 +345,11 @@ async function onInstallPlugin(plugin: any) {
           retries--
         }
       }
-      
+
       if (timer) clearInterval(timer)
       restarting.value = false
       installing.value = false
-      
+
       if (ready) {
         alert('插件安装成功，导航栏已更新！')
       } else {
@@ -360,11 +367,36 @@ async function onInstallPlugin(plugin: any) {
   }
 }
 
+// ===== 插件卸载（Day 52 新增） =====
+const uninstalling = ref(false)
+
+async function onUninstallPlugin(p: any) {
+  const folderName = p.folder_name || p.name
+  if (!confirm(`确定要卸载 ${p.display_name || p.name} 吗？\n\n这会销毁插件的微服务容器（Docker 镜像保留，下次安装可秒启动）。`)) {
+    return
+  }
+
+  uninstalling.value = true
+  try {
+    const adminKey = localStorage.getItem('admin_key') || ''
+    await api.delete(`/admin/market/uninstall/${folderName}`, {
+      headers: { 'X-Admin-Key': adminKey }
+    })
+    alert('插件已卸载，页面将刷新。')
+    // 卸载后建议刷新页面，让导航栏菜单消失
+    window.location.reload()
+  } catch (e: any) {
+    alert('卸载失败：' + (e.response?.data?.detail || e.message || e))
+  } finally {
+    uninstalling.value = false
+  }
+}
+
 onMounted(async () => {
   loadConfig()
   pluginStore.fetchPlugins()
-  fetchMarket() // 新增：拉取市场列表
-  
+  fetchMarket() // 拉取市场列表
+
   if (isTauri) {
     try {
       lanIp.value = await invoke<string>('get_lan_ip')
@@ -464,7 +496,7 @@ onMounted(async () => {
   display: flex;
   gap: var(--spacing-sm);
 }
-.btn-primary, 
+.btn-primary,
 .btn-ghost {
   padding: 10px 20px;
   border-radius: var(--radius-md);
@@ -558,6 +590,17 @@ onMounted(async () => {
 .install-btn {
   margin-left: auto;
   flex-shrink: 0;
+}
+/* Day 52 新增：卸载按钮样式 */
+.uninstall-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: var(--color-danger-text);
+  border-color: var(--color-danger-text);
+}
+.uninstall-btn:hover:not(:disabled) {
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
 }
 .restart-overlay {
   position: fixed;
