@@ -8,17 +8,19 @@ node_modules/
 dist/
 *.db
 .DS_Store
-uploads/data/ 
-backup_*.sql 
-uploads_backup/ 
-data/ 
-backup_*.sql 
-uploads_backup/ 
+
+# 数据与备份（不进版本库）
+data/
+uploads/
+uploads_backup/
+backup_*.sql
+
 # Tauri / Rust
 desktop/node_modules/
 desktop/dist/
 desktop/src-tauri/target/
 desktop/src-tauri/gen/
+
 # Android (Capacitor)
 frontend/android/.gradle/
 frontend/android/build/
@@ -29,9 +31,15 @@ frontend/android/capacitor-cordova-android-plugins/
 frontend/android/app/src/main/assets/public/
 frontend/android/app/src/main/assets/capacitor.config.json
 frontend/android/app/src/main/assets/capacitor.plugins.json
+
+# 后端上传目录
 backend/uploads/
+
 # 外部插件（不提交具体代码，只保留目录结构）
 backend/plugins_installed/*
 !backend/plugins_installed/.gitkeep
 
-docker-compose-linuxbuild/
+# 下载的二进制与打包临时目录
+docker-compose-linux
+docker-compose.exe
+build/
