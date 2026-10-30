@@ -43,9 +43,12 @@ services:
       REDIS_URL: redis://redis:6379/0
       EVENT_BUS_CHANNEL: oj:events
       ADMIN_KEY: ${ADMIN_KEY:-admin-key-change-me}
+      IN_DOCKER: "1"
     volumes:
       - ./backend/uploads:/app/uploads
       - ./backend/plugins_installed:/app/plugins_installed
+      # ===== 新增：backend 需要 Docker Socket 来拉起插件微服务 =====
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       postgres:
         condition: service_healthy
@@ -77,7 +80,6 @@ services:
         condition: service_started
     restart: unless-stopped
 
-  # 下面三个服务用于自动构建判题镜像
   sandbox-python:
     build: ./backend/sandbox/python
     image: judge-python:latest

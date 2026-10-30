@@ -28,6 +28,11 @@ RUN mkdir -p /app/uploads
 # 从官方镜像拷贝 docker CLI，worker 判题调用沙箱时使用
 COPY --from=docker:27-cli /usr/local/bin/docker /usr/local/bin/docker
 
+# 【Day 52 新增】Docker Compose 插件，供插件微服务编排（on_install/on_uninstall）
+COPY docker-compose-linux /usr/local/libexec/docker/cli-plugins/docker-compose
+RUN chmod +x /usr/local/libexec/docker/cli-plugins/docker-compose \
+    && rm -f /app/docker-compose-linux
+
 # 暴露端口
 EXPOSE 8000
 
