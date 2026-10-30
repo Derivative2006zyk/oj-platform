@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.core.event_bus import get_event_bus
-from app.core.plugin_registry import get_plugin_registry
+from app.core.plugin_registry import get_plugin_registry, PLUGINS_INSTALLED_DIR
 
 
 @asynccontextmanager
@@ -18,7 +18,7 @@ async def lifespan(app: FastAPI):
 
     registry = get_plugin_registry()
     registry.discover("app.plugins")
-    registry.discover_external("/app/plugins_installed")
+    registry.discover_external(str(PLUGINS_INSTALLED_DIR))
     registry._build_instances()
     await registry.load_all()
 
@@ -74,7 +74,7 @@ async def health():
 # ===== 挂载插件路由 =====
 _registry = get_plugin_registry()
 _registry.discover("app.plugins")
-_registry.discover_external("/app/plugins_installed")
+_registry.discover_external(str(PLUGINS_INSTALLED_DIR))
 _registry._build_instances()
 
 for router in _registry.collect_routers():
@@ -87,6 +87,10 @@ async def get_plugins_ui():
 
 
 # ===== 挂载插件静态文件（最稳的原生方案） =====
-plugins_static_dir = "/app/plugins_installed"
+plugins_static_dir = str(PLUGINS_INSTALLED_DIR)
 if os.path.exists(plugins_static_dir):
-    app.mount("/plugins_static", StaticFiles(directory=plugins_static_dir), name="plugins_static")
+    app.mount(
+        "/plugins_static",
+        StaticFiles(directory=plugins_static_dir),
+        name="plugins_static",
+    )
