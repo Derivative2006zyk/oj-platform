@@ -13,15 +13,16 @@
           </template>
         </template>
         
-        <!-- 动态插件菜单 -->
-        <router-link
-          v-for="p in pluginStore.plugins"
-          :key="p.name"
-          :to="p.ui_manifest?.route_path || '/plugin/' + p.folder_name"
-          class="nav-link"
-        >
-          {{ p.ui_manifest?.menu_name || p.display_name }}
-        </router-link>
+        <!-- 动态插件菜单（增加 v-if 过滤禁用插件） -->
+        <template v-for="p in pluginStore.plugins" :key="p.name">
+          <router-link
+            v-if="p.enabled !== false"
+            :to="p.ui_manifest?.route_path || '/plugin/' + p.folder_name"
+            class="nav-link"
+          >
+            {{ p.ui_manifest?.menu_name || p.display_name }}
+          </router-link>
+        </template>
       </nav>
 
       <div class="right-section">

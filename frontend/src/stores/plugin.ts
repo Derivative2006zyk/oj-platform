@@ -9,6 +9,7 @@ export interface PluginManifest {
   author: string
   description: string
   folder_name: string
+  enabled?: boolean // 新增：启用状态
   ui_manifest?: {
     menu_name: string
     route_path: string
@@ -22,7 +23,6 @@ export const usePluginStore = defineStore('plugin', () => {
 
   async function fetchPlugins() {
     try {
-      // 加时间戳，强制浏览器每次都向服务器请求最新数据
       const res = await api.get<PluginManifest[]>('/plugins/ui?_t=' + Date.now())
       plugins.value = res.data
     } catch (e) {
