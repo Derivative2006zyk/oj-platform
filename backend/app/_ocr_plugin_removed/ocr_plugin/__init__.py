@@ -1,17 +1,13 @@
 import asyncio
 from pathlib import Path
-
 import httpx
-
 from app.core.plugin_base import Plugin
 from app.core.plugin_registry import register_plugin
 
-# 与插件包内 docker-compose.yml 中 container_name 保持一致
 OCR_SERVICE_CONTAINER = "oj-plugin-ocr_plugin-service"
 OCR_SERVICE_URL = f"http://{OCR_SERVICE_CONTAINER}:8001"
-# 用 FastAPI 默认暴露的 /openapi.json 做健康探测，比自定义 /health 更通用
-OCR_SERVICE_HEALTH = f"{OCR_SERVICE_URL}/openapi.json"
-
+# 切回标准健康检查端点
+OCR_SERVICE_HEALTH = f"{OCR_SERVICE_URL}/health"
 
 @register_plugin
 class OcrPlugin(Plugin):
