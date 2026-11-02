@@ -97,7 +97,7 @@
                 <div class="plugin-desc">{{ p.description }}</div>
                 <div class="plugin-author">作者: {{ p.author }}</div>
               </div>
-              <button class="btn-primary install-btn" @click="onInstallPlugin(p)" :disabled="installing || restarting || !p.download_url">
+              <button class="btn-primary install-btn" @click="onInstallPlugin(p)" :disabled="installing || !p.download_url">
                 {{ installing ? '安装中...' : (p.download_url ? '一键安装' : '敬请期待') }}
               </button>
             </div>
@@ -106,16 +106,16 @@
       </section>
     </div>
 
-    <!-- ===== 重启全屏遮罩 ===== -->
-    <div v-if="restarting" class="restart-overlay">
+    <!-- ===== 安装/重启 全屏遮罩 ===== -->
+    <div v-if="installing || restarting" class="restart-overlay">
       <div class="spinner"></div>
-      <div class="restart-text">正在重启服务并加载新配置（已耗时 {{ restartSeconds }} 秒）...</div>
+      <div class="restart-text">{{ overlayText }}</div>
     </div>
   </main>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { getBackendUrl, setBackendUrl, isTauriEnv } from '../utils/backend-url'
 import { usePluginStore } from '../stores/plugin'
@@ -251,43 +251,93 @@ async function fetchMarket() {
   }
 }
 
-// ===== 插件安装/启用/禁用/卸载 =====
+// ===== 插件安装（异步轮询版） =====
 const installing = ref(false)
+const installingPluginName = ref('')
+const installStatus = ref('')
 const restarting = ref(false)
-const restartSeconds = ref(0)
-let timer: number | null = null
+let pollTimer: number | null = null
 
-function triggerRestart() {
-  if (isTauri) {
-    restarting.value = true
-    restartSeconds.value = 0
-    timer = window.setInterval(() => { restartSeconds.value++ }, 1000)
-    invoke('restart_backend_cmd').finally(() => {
-      if (timer) clearInterval(timer)
-      restarting.value = false
-      window.location.reload()
-    })
-  } else {
-    alert('配置已更新！请手动重启后端服务后刷新页面。')
+const overlayText = computed(() => {
+  if (restarting.value) return '安装成功，正在重启后端以加载新插件...'
+  switch (installStatus.value) {
+    case 'starting': return '正在建立连接...'
+    case 'downloading': return '正在下载插件包...'
+    case 'extracting': return '正在解压文件...'
+    case 'installing_deps': return '正在安装依赖库 (可能耗时较久)...'
+    case 'starting_service': return '正在启动微服务，请稍候...'
+    default: return '处理中...'
   }
-}
+})
 
 async function onInstallPlugin(plugin: any) {
   if (!plugin.download_url) return
   if (!confirm(`确定要安装 ${plugin.display_name} 吗？`)) return
+
   installing.value = true
+  installingPluginName.value = plugin.name
+  installStatus.value = 'starting'
+
   try {
     const adminKey = localStorage.getItem('admin_key') || ''
-    await api.post('/admin/market/install', { download_url: plugin.download_url }, { headers: { 'X-Admin-Key': adminKey } })
-    alert('插件安装成功！需重启后端生效。')
-    triggerRestart()
+    
+    // 1. 触发后台安装
+    await api.post('/admin/market/install', 
+      { download_url: plugin.download_url }, 
+      { headers: { 'X-Admin-Key': adminKey } }
+    )
+
+    // 2. 开启轮询
+    let retries = 300 // 最多等 5 分钟 (1s 一次)
+    pollTimer = window.setInterval(async () => {
+      try {
+        const res = await api.get(`/admin/market/install_status/${plugin.name}`, {
+          headers: { 'X-Admin-Key': adminKey }
+        })
+        const status = res.data.status
+        installStatus.value = status
+
+        if (status === 'success') {
+          if (pollTimer) clearInterval(pollTimer)
+          installing.value = false
+          triggerRestart()
+        } else if (status === 'error') {
+          if (pollTimer) clearInterval(pollTimer)
+          installing.value = false
+          alert('安装失败：' + res.data.detail)
+        }
+      } catch (e) {
+        console.error('轮询状态失败', e)
+      }
+
+      retries--
+      if (retries <= 0) {
+        if (pollTimer) clearInterval(pollTimer)
+        installing.value = false
+        alert('安装超时，请检查后端日志。')
+      }
+    }, 1000)
+
   } catch (e: any) {
-    alert('安装失败：' + (e.response?.data?.detail || e.message || e))
-  } finally {
     installing.value = false
+    alert('启动安装失败：' + (e.response?.data?.detail || e.message || e))
   }
 }
 
+function triggerRestart() {
+  if (isTauri) {
+    restarting.value = true
+    invoke('restart_backend_cmd').finally(() => {
+      restarting.value = false
+      window.location.reload()
+    })
+  } else {
+    alert('插件安装成功！请手动重启后端服务后刷新页面。')
+    window.location.reload()
+  }
+}
+
+// ===== 插件启停/卸载 =====
 const toggling = ref(false)
 async function onTogglePlugin(p: any) {
   if (!confirm(`确定要${p.enabled ? '禁用' : '启用'} ${p.display_name} 吗？`)) return
@@ -333,7 +383,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-/* 保持你原来的样式不变，新增 plugin-actions 和 is-disabled 即可 */
+/* 样式与之前完全保持一致 */
 .settings-page { padding: var(--spacing-xl) 0; min-height: calc(100vh - 56px); }
 .container { max-width: 800px; margin: 0 auto; padding: 0 var(--spacing-lg); }
 .page-header { margin-bottom: var(--spacing-lg); }
