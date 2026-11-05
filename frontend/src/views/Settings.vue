@@ -90,16 +90,31 @@
         <div class="card-body">
           <div v-if="marketLoading" class="empty-text">正在获取市场列表...</div>
           <div v-else-if="marketPlugins.length === 0" class="empty-text">暂无可用插件。</div>
-          <div v-else class="plugin-list">
-            <div v-for="p in marketPlugins" :key="p.name" class="plugin-item">
-              <div class="plugin-info">
-                <div class="plugin-title">{{ p.display_name }} <span class="version">v{{ p.version }}</span></div>
-                <div class="plugin-desc">{{ p.description }}</div>
-                <div class="plugin-author">作者: {{ p.author }}</div>
+          <div v-else class="market-grid">
+            <div v-for="p in marketPlugins" :key="p.name" class="market-card">
+              
+              <!-- 动态字母图标 -->
+              <div class="market-icon" :style="{ backgroundColor: getIconColor(p.name) }">
+                {{ getIconLetter(p.display_name) }}
               </div>
-              <button class="btn-primary install-btn" @click="onInstallPlugin(p)" :disabled="installing || !p.download_url">
-                {{ installing ? '安装中...' : (p.download_url ? '一键安装' : '敬请期待') }}
-              </button>
+              
+              <div class="market-info">
+                <div class="market-title">
+                  {{ p.display_name }} <span class="version">v{{ p.version }}</span>
+                </div>
+                <div class="market-desc">{{ p.description }}</div>
+                <div class="market-meta">
+                  <span class="category">{{ p.category }}</span>
+                  <span class="author">{{ p.author }}</span>
+                </div>
+              </div>
+              <div class="market-footer">
+                <button v-if="isInstalled(p.name)" class="btn-ghost" disabled>已安装</button>
+                <button v-else-if="!p.download_url" class="btn-ghost" disabled>敬请期待</button>
+                <button v-else class="btn-primary" @click="onInstallPlugin(p)" :disabled="installing">
+                  {{ installing ? '安装中...' : '一键安装' }}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -123,6 +138,24 @@ import api from '../utils/axios'
 
 const pluginStore = usePluginStore()
 const isTauri = isTauriEnv()
+
+// ===== 插件市场图标辅助 =====
+function getIconLetter(displayName: string) {
+  return displayName ? displayName.charAt(0).toUpperCase() : 'P'
+}
+function getIconColor(name: string) {
+  const colors = ['#0066cc', '#34a853', '#ea4335', '#fbbc05', '#8e44ad']
+  let hash = 0
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  return colors[Math.abs(hash) % colors.length]
+}
+
+// ===== 判断插件是否已安装 =====
+function isInstalled(pluginName: string) {
+  return pluginStore.plugins.some(p => p.name === pluginName)
+}
 
 // ===== 数据备份与恢复 =====
 const backingUp = ref(false)
@@ -281,14 +314,12 @@ async function onInstallPlugin(plugin: any) {
   try {
     const adminKey = localStorage.getItem('admin_key') || ''
     
-    // 1. 触发后台安装
     await api.post('/admin/market/install', 
       { download_url: plugin.download_url }, 
       { headers: { 'X-Admin-Key': adminKey } }
     )
 
-    // 2. 开启轮询
-    let retries = 300 // 最多等 5 分钟 (1s 一次)
+    let retries = 300
     pollTimer = window.setInterval(async () => {
       try {
         const res = await api.get(`/admin/market/install_status/${plugin.name}`, {
@@ -383,7 +414,6 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-/* 样式与之前完全保持一致 */
 .settings-page { padding: var(--spacing-xl) 0; min-height: calc(100vh - 56px); }
 .container { max-width: 800px; margin: 0 auto; padding: 0 var(--spacing-lg); }
 .page-header { margin-bottom: var(--spacing-lg); }
@@ -412,6 +442,8 @@ onMounted(async () => {
 .test-result.success { background: var(--color-success-bg); color: var(--color-success-text); }
 .test-result.error { background: var(--color-danger-bg); color: var(--color-danger-text); }
 .empty-text { text-align: center; color: var(--color-text-muted); padding: 20px; font-size: var(--font-size-body); }
+
+/* 已安装列表 */
 .plugin-list { display: flex; flex-direction: column; gap: 12px; }
 .plugin-item { padding: 12px 16px; background: var(--color-sample-bg); border-radius: var(--radius-md); border: 1px solid var(--color-border-light); display: flex; align-items: center; gap: var(--spacing-md); transition: opacity 0.2s; }
 .plugin-item.is-disabled { opacity: 0.6; }
@@ -421,9 +453,77 @@ onMounted(async () => {
 .plugin-desc { font-size: 13px; color: var(--color-text-secondary); margin-bottom: 6px; }
 .plugin-author { font-size: 12px; color: var(--color-text-muted); }
 .plugin-actions { margin-left: auto; display: flex; gap: 8px; flex-shrink: 0; }
-.install-btn { margin-left: auto; flex-shrink: 0; }
 .uninstall-btn { color: var(--color-danger-text); border-color: var(--color-danger-text); }
 .uninstall-btn:hover:not(:disabled) { background: var(--color-danger-bg); color: var(--color-danger-text); }
+
+/* ===== 插件市场网格布局 ===== */
+.market-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--spacing-md);
+}
+.market-card {
+  background: var(--color-bg-page);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+.market-card:hover {
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-2px);
+}
+
+/* 纯色首字母图标 */
+.market-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: bold;
+  margin-bottom: var(--spacing-md);
+}
+
+.market-info {
+  flex: 1;
+}
+.market-title {
+  font-size: 16px;
+  font-weight: bold;
+  color: var(--color-text-primary);
+  margin-bottom: 8px;
+}
+.market-desc {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+.market-meta {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.market-meta .category {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+}
+.market-footer {
+  margin-top: var(--spacing-md);
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* 遮罩 */
 .restart-overlay { position: fixed; inset: 0; background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; }
 .spinner { width: 40px; height: 40px; border: 4px solid var(--color-border); border-top-color: var(--color-primary); border-radius: 50%; animation: spin 1s linear infinite; }
 .restart-text { margin-top: var(--spacing-md); color: var(--color-primary); font-weight: bold; font-size: var(--font-size-body); }
