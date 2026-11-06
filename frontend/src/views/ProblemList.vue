@@ -126,7 +126,7 @@
             <span class="type-badge">{{ typeLabel(problem.type) }}</span>
             <span class="difficulty">{{ '★'.repeat(problem.difficulty) }}</span>
             
-            <!-- 新增管理员操作按钮 -->
+            <!-- 管理员操作按钮 -->
             <div v-if="userStore.isAdmin" class="admin-actions">
               <button class="action-btn edit-btn" @click.stop="goEdit(problem.id)">编辑</button>
               <button class="action-btn delete-btn" @click.stop="onDelete(problem.id)">删除</button>
@@ -303,7 +303,9 @@ import {
 } from '../api/bank'
 
 import { useUserStore } from '../stores/user'
-import { deleteProblem } from '../api/problem' // 注意路径，确保 api 文件夹下有这个方法
+import { deleteProblem } from '../api/problem'
+import { openGlobalWS, type GlobalWSHandle } from '../utils/ws'
+
 
 const showOcrModal = ref(false)
 const userStore = useUserStore()
@@ -356,6 +358,9 @@ const groupedView = ref(false)
 const groupLoading = ref(false)
 const groupedProblems = ref<{ key: string; title: string; items: ProblemSummary[] }[]>([])
 const openGroups = ref<Record<string, boolean>>({})
+
+// 全局 WS 句柄
+let globalWs: GlobalWSHandle | null = null
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
 
@@ -476,13 +481,13 @@ async function onDelete(id: number) {
   if (!confirm('确定要删除这道题目吗？相关的提交记录也会被一并删除！')) return
   
   try {
-    // 如果后端 deleteProblem 需要 X-Admin-Key，你需要在本地存一下
     const adminKey = prompt('请输入管理员密钥以确认删除:', localStorage.getItem('admin_key') || 'admin-key-change-me')
     if (!adminKey) return
     localStorage.setItem('admin_key', adminKey)
     
     await deleteProblem(id)
-    loadProblems() // 刷新列表
+    // 注意：这里不需要手动调用 loadProblems()，因为后端删除后会触发 WebSocket 广播，
+    // 我们挂载的 ws.onmessage 会收到 'problem.deleted' 并自动刷新
   } catch (e: any) {
     alert('删除失败：' + (e.response?.data?.detail || e.message))
   }
@@ -541,6 +546,7 @@ async function onImportSubmit() {
     const result = await importBank(importDialog.file, importDialog.strategy)
     importDialog.result = result
 
+    // 导入后需要手动刷新，因为后端如果没有逐条发事件，这里需要兜底刷新
     await Promise.all([loadBanks(), loadProblems()])
     if (groupedView.value) {
       await loadGrouped()
@@ -648,6 +654,10 @@ watch(keyword, () => {
 
 onUnmounted(() => {
   if (searchTimer) clearTimeout(searchTimer)
+  if (globalWs) {
+    globalWs.close()
+    globalWs = null
+  }
 })
 
 // ===== 初始化 =====
@@ -673,7 +683,20 @@ onMounted(async () => {
     allTags.value = []
     banks.value = []
   }
+  
   await loadProblems()
+
+  // 建立全局 WebSocket 连接
+  globalWs = openGlobalWS((msg) => {
+    if (['problem.created', 'problem.updated', 'problem.deleted'].includes(msg.type)) {
+      console.log('[Global WS] 检测到题库变化，自动刷新')
+      loadProblems()
+      loadBanks() // 题目增删会影响题库的计数
+      if (groupedView.value) {
+        loadGrouped()
+      }
+    }
+  })
 })
 </script>
 

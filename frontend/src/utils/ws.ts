@@ -46,3 +46,34 @@ export function openSubmissionWS(
     isOpen: () => ws.readyState === WebSocket.OPEN,
   }
 }
+
+export interface GlobalWSHandle {
+  close: () => void
+}
+
+export function openGlobalWS(
+  onMessage: (msg: any) => void,
+  onError?: (e: Event) => void
+): GlobalWSHandle {
+  const base = getWsBaseUrl()
+  const url = `${base}/api/ws/global`
+  const ws = new WebSocket(url)
+
+  ws.onmessage = (e) => {
+    try {
+      onMessage(JSON.parse(e.data))
+    } catch (err) {
+      console.warn('Global WS message parse error', err)
+    }
+  }
+
+  ws.onerror = (e) => {
+    if (onError) onError(e)
+  }
+
+  return {
+    close: () => {
+      try { ws.close() } catch {}
+    }
+  }
+}
