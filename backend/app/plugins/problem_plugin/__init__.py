@@ -1,8 +1,7 @@
-from fastapi import APIRouter
-
 from app.core.plugin_base import Plugin
 from app.core.plugin_registry import register_plugin
-from app.core.events import EventNames
+from app.core.event_bus import get_event_bus
+from app.core.ws_manager import get_ws_manager
 
 
 @register_plugin
@@ -12,33 +11,36 @@ class ProblemPlugin(Plugin):
     dependencies = []
 
     async def on_load(self) -> None:
-        # 订阅问题事件（今天只订阅，不发布）
-        from app.core.event_bus import get_event_bus
         bus = get_event_bus()
-        bus.subscribe(EventNames.PROBLEM_CREATED, self._on_problem_created)
-        bus.subscribe(EventNames.PROBLEM_UPDATED, self._on_problem_updated)
-        bus.subscribe(EventNames.PROBLEM_DELETED, self._on_problem_deleted)
+        bus.subscribe("problem.created", self._broadcast_created)
+        bus.subscribe("problem.updated", self._broadcast_updated)
+        bus.subscribe("problem.deleted", self._broadcast_deleted)
+
+    async def _broadcast_created(self, data: dict):
+        await get_ws_manager().broadcast({"type": "problem.created", "data": data})
+
+    async def _broadcast_updated(self, data: dict):
+        await get_ws_manager().broadcast({"type": "problem.updated", "data": data})
+
+    async def _broadcast_deleted(self, data: dict):
+        await get_ws_manager().broadcast({"type": "problem.deleted", "data": data})
 
     def get_routers(self):
-        from app.plugins.problem_plugin.api import router as problem_router
-        from app.plugins.problem_plugin.image_api import router as image_router
+        from app.plugins.problem_plugin.api import router as api_router
         from app.plugins.problem_plugin.admin_api import router as admin_router
+        from app.plugins.problem_plugin.image_api import router as image_router
+        from app.plugins.problem_plugin.market_api import router as market_router
+        
+        # 【新增】导入 bank 相关的路由
         from app.plugins.problem_plugin.bank_api import router as bank_router
         from app.plugins.problem_plugin.bank_crud_api import router as bank_crud_router
-        from app.plugins.problem_plugin.backup_api import router as backup_router
-        from app.plugins.problem_plugin.market_api import router as market_router  # 新增
+        
         return [
-            problem_router, image_router, admin_router, 
-            bank_router, bank_crud_router, backup_router, market_router
+            api_router, 
+            admin_router, 
+            image_router, 
+            market_router,
+            # 【新增】挂载 bank 路由
+            bank_router,
+            bank_crud_router,
         ]
-
-    # ===== 事件处理器 =====
-
-    async def _on_problem_created(self, payload: dict) -> None:
-        print(f"[problem_plugin] problem created: {payload}")
-
-    async def _on_problem_updated(self, payload: dict) -> None:
-        print(f"[problem_plugin] problem updated: {payload}")
-
-    async def _on_problem_deleted(self, payload: dict) -> None:
-        print(f"[problem_plugin] problem deleted: {payload}")

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import async_session
 from app.models.problem import Problem
@@ -10,6 +10,7 @@ from app.schemas.problem import (
     ProblemUpdate,
 )
 from app.core.security import verify_admin_key
+from app.core.ws_manager import get_ws_manager
 
 router = APIRouter(prefix="/api", tags=["problems"])
 
@@ -92,3 +93,16 @@ async def delete_problem(
     if not success:
         raise HTTPException(status_code=404, detail="Problem not found")
     return {"message": "deleted"}
+
+@router.websocket("/ws/global")
+async def ws_global(websocket: WebSocket):
+    """全局事件 WebSocket（题库增删改等）"""
+    ws_manager = get_ws_manager()
+    await ws_manager.connect_global(websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        ws_manager.disconnect_global(websocket)
+    except Exception:
+        ws_manager.disconnect_global(websocket)
