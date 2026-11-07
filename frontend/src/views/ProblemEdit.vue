@@ -217,7 +217,8 @@ const form = reactive({
   test_cases: [] as any[],
   options: [] as any[],
   blanks: [] as any[],
-  subprojects: [] as any[]
+  subprojects: [] as any[],
+  version: 1
 })
 
 // ===================== 测试用例 =====================
@@ -309,7 +310,8 @@ function buildSubmitData() {
     tags: tagsInput.value
       .split(',')
       .map(t => t.trim())
-      .filter(t => t)
+      .filter(t => t),
+    version: form.version,
   }
 
   if (form.type === 'algorithm') {
@@ -403,6 +405,10 @@ async function submit() {
     }
     router.push('/')
   } catch (e: any) {
+    if (e.response?.status === 409){
+      alert(e.response.data.detail || '该题目已被其他设备修改，请刷新后重试。')
+      return
+    }
     const msg = e.response?.data?.detail || e.message || '保存失败'
     alert('保存失败：' + msg)
   } finally {
@@ -443,6 +449,7 @@ onMounted(async () => {
     form.difficulty = detail.difficulty || 1
     form.description = detail.description || ''
     form.explanation = detail.explanation || ''
+    form.version = (detail as any).version || 1
     tagsInput.value = Array.isArray(detail.tags) ? detail.tags.join(',') : ''
 
     if (detail.type === 'algorithm') {
