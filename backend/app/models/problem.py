@@ -20,6 +20,10 @@ class Problem(Base):
     explanation: Mapped[str] = mapped_column(Text, nullable=True)
     options: Mapped[list] = mapped_column(JSONB, nullable=True)
     blanks: Mapped[list] = mapped_column(JSONB, nullable=True)
+    
+    # 【新增】乐观锁版本号
+    version: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
+
     created_at: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[DateTime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()
