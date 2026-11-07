@@ -1,3 +1,4 @@
+from fastapi import HTTPException # 新增导入
 from sqlalchemy import select, func, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,7 +12,6 @@ from app.core.events import EventNames
 
 
 async def get_all_categories(db: AsyncSession):
-    """Get all categories sorted by sort_order."""
     result = await db.execute(select(Category).order_by(Category.sort_order))
     return result.scalars().all()
 
@@ -28,7 +28,6 @@ async def get_problem_list(
     bank_id: int = None,
     unassigned: bool = False,
 ):
-    """Get problem list with filters and pagination."""
     query = select(Problem)
     if category_id:
         query = query.where(Problem.category_id == category_id)
@@ -64,7 +63,6 @@ async def get_problem_list(
     }
 
 async def get_problem_detail(db: AsyncSession, problem_id: int):
-    """Get problem detail, with type-specific extra data."""
     problem = await db.get(Problem, problem_id)
     if not problem:
         return None
@@ -77,12 +75,13 @@ async def get_problem_detail(db: AsyncSession, problem_id: int):
         "difficulty": problem.difficulty,
         "tags": problem.tags,
         "category_id": problem.category_id,
-        "bank_id": problem.bank_id,   # 新增
+        "bank_id": problem.bank_id,
         "explanation": problem.explanation,
         "options": problem.options,
         "blanks": problem.blanks,
         "test_cases": [],
         "subprojects": [],
+        "version": problem.version, # 【新增】吐出 version
     }
 
     if problem.type == "algorithm":
@@ -119,7 +118,6 @@ async def get_problem_detail(db: AsyncSession, problem_id: int):
 
 
 async def get_all_tags(db: AsyncSession):
-    """Get all unique tags."""
     result = await db.execute(select(Problem.tags))
     all_tags = set()
     for row in result.scalars().all():
@@ -129,7 +127,6 @@ async def get_all_tags(db: AsyncSession):
 
 
 async def create_problem(db: AsyncSession, data: ProblemCreate):
-    """Create a problem with type-specific related data."""
     problem = Problem(
         title=data.title,
         category_id=data.category_id,
@@ -142,6 +139,7 @@ async def create_problem(db: AsyncSession, data: ProblemCreate):
         explanation=data.explanation,
         options=data.options,
         blanks=data.blanks,
+        version=1, # 初始化版本号
     )
     db.add(problem)
     await db.flush()
@@ -188,17 +186,29 @@ async def create_problem(db: AsyncSession, data: ProblemCreate):
 
 
 async def update_problem(db: AsyncSession, problem_id: int, data: ProblemUpdate):
-    """Update a problem (partial update)."""
     problem = await db.get(Problem, problem_id)
     if not problem:
         return None
 
+    # 【新增】乐观锁校验
+    if problem.version != data.version:
+        raise HTTPException(
+            status_code=409,
+            detail="保存失败：该题目已被其他设备修改，请刷新后重试。"
+        )
+
     update_data = data.model_dump(exclude_unset=True)
+    # 把 version 弹出来，防止被 setattr 覆盖
+    update_data.pop("version", None)
+    
     test_cases_data = update_data.pop("test_cases", None)
     subprojects_data = update_data.pop("subprojects", None)
 
     for field, value in update_data.items():
         setattr(problem, field, value)
+
+    # 更新版本号
+    problem.version += 1
 
     if test_cases_data is not None:
         await db.execute(
@@ -250,7 +260,6 @@ async def update_problem(db: AsyncSession, problem_id: int, data: ProblemUpdate)
 
 
 async def delete_problem(db: AsyncSession, problem_id: int):
-    """Delete a problem (cascade deletes related rows)."""
     problem = await db.get(Problem, problem_id)
     if not problem:
         return False

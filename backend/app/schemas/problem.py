@@ -47,6 +47,9 @@ class ProblemUpdate(BaseModel):
     blanks: Optional[List[dict]] = None
     test_cases: Optional[List[TestCaseCreate]] = None
     subprojects: Optional[List[SubprojectCreate]] = None
+    
+    # 【新增】必须传 version 才能更新
+    version: int
 
 
 class ProblemSummary(BaseModel):
@@ -74,6 +77,10 @@ class ProblemDetail(BaseModel):
     blanks: Optional[List[dict]] = None
     test_cases: List[dict] = []
     subprojects: List[dict] = []
+    
+    # 【新增】返回 version 给前端
+    version: int
+    
     model_config = ConfigDict(from_attributes=True)
 
 
