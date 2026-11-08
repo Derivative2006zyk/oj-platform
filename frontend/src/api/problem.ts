@@ -30,17 +30,7 @@ export interface ProblemListResponse {
   items: ProblemSummary[]
 }
 
-export async function getProblems(params: {
-  page?: number
-  page_size?: number
-  category_id?: number
-  difficulty?: number
-  type?: string
-  tag?: string
-  keyword?: string
-  bank_id?: number
-  unassigned?: boolean
-}): Promise<ProblemListResponse> {
+export async function getProblems(params: any): Promise<ProblemListResponse> {
   const res = await api.get('/problems', { params })
   return res.data
 }
