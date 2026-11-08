@@ -1,7 +1,12 @@
 <template>
   <div class="problem-list">
+    <!-- 离线模式提示 -->
+    <div v-if="isOffline" class="offline-alert">
+      当前处于离线模式，显示的是上次缓存的数据。网络恢复后将自动刷新。
+    </div>
+
     <!-- 未连接服务器提示 -->
-    <div v-if="connectionError" class="connection-alert">
+    <div v-if="connectionError && !isOffline" class="connection-alert">
       <span>
         无法连接到服务器。请确认远程后端已启动，并前往右上角
         <router-link to="/settings">设置</router-link>
@@ -305,7 +310,7 @@ import {
 import { useUserStore } from '../stores/user'
 import { deleteProblem } from '../api/problem'
 import { openGlobalWS, type GlobalWSHandle } from '../utils/ws'
-
+import { setCache, getCache } from '../utils/cache'
 
 const showOcrModal = ref(false)
 const userStore = useUserStore()
@@ -315,6 +320,7 @@ const route = useRoute()
 
 // ===== 状态 =====
 const connectionError = ref(false)
+const isOffline = ref(false)
 const problems = ref<ProblemSummary[]>([])
 const categories = ref<Category[]>([])
 const allTags = ref<string[]>([])
@@ -418,13 +424,21 @@ async function loadProblems() {
     })
     problems.value = Array.isArray(data?.items) ? data.items : []
     total.value = typeof data?.total === 'number' ? data.total : 0
+    
+    isOffline.value = false
     connectionError.value = false
+
+    // 请求成功，无脑存缓存
+    setCache('oj_problem_list_cache', { items: problems.value, total: total.value })
   } catch (e: any) {
-    console.error('加载题目列表失败', e)
-    problems.value = []
-    total.value = 0
-    // 识别网络断开
-    if (!e.response || e.code === 'ERR_NETWORK' || e.message?.includes('Network Error')) {
+    console.warn('网络请求失败', e)
+    isOffline.value = true
+    // 请求失败，取缓存
+    const cached = getCache<{ items: ProblemSummary[], total: number }>('oj_problem_list_cache')
+    if (cached) {
+      problems.value = cached.items
+      total.value = cached.total
+    } else if (problems.value.length === 0) {
       connectionError.value = true
     }
   }
@@ -486,12 +500,11 @@ async function onDelete(id: number) {
     localStorage.setItem('admin_key', adminKey)
     
     await deleteProblem(id)
-    // 注意：这里不需要手动调用 loadProblems()，因为后端删除后会触发 WebSocket 广播，
-    // 我们挂载的 ws.onmessage 会收到 'problem.deleted' 并自动刷新
   } catch (e: any) {
     alert('删除失败：' + (e.response?.data?.detail || e.message))
   }
 }
+
 // ===== 导出 =====
 async function onExport() {
   if (exporting.value) return
@@ -546,7 +559,6 @@ async function onImportSubmit() {
     const result = await importBank(importDialog.file, importDialog.strategy)
     importDialog.result = result
 
-    // 导入后需要手动刷新，因为后端如果没有逐条发事件，这里需要兜底刷新
     await Promise.all([loadBanks(), loadProblems()])
     if (groupedView.value) {
       await loadGrouped()
@@ -638,7 +650,7 @@ async function loadBanks() {
     const data = await listBanks()
     banks.value = Array.isArray(data) ? data : []
   } catch (e) {
-    console.error('加载题库失败', e)
+    console.warn('加载题库失败', e)
     banks.value = []
   }
 }
@@ -652,11 +664,16 @@ watch(keyword, () => {
   }, 500)
 })
 
+let onlineHandler: () => void
+
 onUnmounted(() => {
   if (searchTimer) clearTimeout(searchTimer)
   if (globalWs) {
     globalWs.close()
     globalWs = null
+  }
+  if (onlineHandler) {
+    window.removeEventListener('online', onlineHandler)
   }
 })
 
@@ -668,46 +685,60 @@ onMounted(async () => {
     showUnassigned.value = true
   }
 
-  try {
-    const [cats, tags, bs] = await Promise.all([
-      getCategories(),
-      getAllTags(),
-      listBanks(),
-    ])
-    categories.value = Array.isArray(cats) ? cats : []
-    allTags.value = Array.isArray(tags) ? tags : []
-    banks.value = Array.isArray(bs) ? bs : []
-  } catch (e) {
-    console.error('加载分类/标签/题库失败', e)
-    categories.value = []
-    allTags.value = []
-    banks.value = []
+  // 1. 首屏直接读缓存渲染（极速离线体验）
+  const cachedData = getCache<{ items: ProblemSummary[], total: number }>('oj_problem_list_cache')
+  if (cachedData && page.value === 1) {
+    problems.value = cachedData.items
+    total.value = cachedData.total
+    isOffline.value = true // 先假定离线，等请求成功会改成 false
   }
-  
-  await loadProblems()
 
-  // 建立全局 WebSocket 连接
+  // 2. 后台发请求
+  loadProblems()
+
+  // 3. 加载其他数据
+  try { categories.value = await getCategories() } catch (e) { /* 忽略 */ }
+  try { allTags.value = await getAllTags() } catch (e) { /* 忽略 */ }
+  try { banks.value = await listBanks() } catch (e) { /* 忽略 */ }
+
+  // 4. 建立 WebSocket
   globalWs = openGlobalWS((msg) => {
     if (['problem.created', 'problem.updated', 'problem.deleted'].includes(msg.type)) {
-      console.log('[Global WS] 检测到题库变化，自动刷新')
       loadProblems()
-      loadBanks() // 题目增删会影响题库的计数
-      if (groupedView.value) {
-        loadGrouped()
-      }
+      loadBanks()
+      if (groupedView.value) loadGrouped()
     }
   })
+
+  // 5. 监听网络恢复
+  onlineHandler = () => {
+    console.log('[Network] 网络恢复，自动刷新')
+    loadProblems()
+    loadBanks()
+  }
+  window.addEventListener('online', onlineHandler)
 })
 </script>
 
 <style scoped>
+/* 样式保持不变 */
 .problem-list {
   max-width: 960px;
   margin: 0 auto;
   padding: var(--spacing-xl) var(--spacing-lg);
 }
 
-/* ===== 未连接警告 ===== */
+.offline-alert {
+  background: var(--color-sample-bg);
+  color: var(--color-text-secondary);
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  margin-bottom: var(--spacing-md);
+  font-size: 14px;
+  border: 1px dashed var(--color-border);
+  text-align: center;
+}
+
 .connection-alert {
   background: var(--color-warning-bg);
   color: var(--color-warning-text);
@@ -723,7 +754,6 @@ onMounted(async () => {
   text-decoration: underline;
 }
 
-/* ===== 页头 ===== */
 .page-header {
   margin-bottom: var(--spacing-lg);
 }
@@ -741,7 +771,6 @@ onMounted(async () => {
   margin: 0;
 }
 
-/* ===== 题库导航 ===== */
 .bank-nav {
   display: flex;
   gap: var(--spacing-sm);
@@ -787,7 +816,6 @@ onMounted(async () => {
   color: var(--color-primary);
 }
 
-/* ===== 分类导航 ===== */
 .category-nav {
   display: flex;
   gap: var(--spacing-sm);
@@ -817,7 +845,6 @@ onMounted(async () => {
   border-color: var(--color-primary);
 }
 
-/* ===== 卡片 ===== */
 .card {
   background: var(--color-bg-card);
   border-radius: var(--radius-lg);
@@ -874,7 +901,6 @@ onMounted(async () => {
   border-color: var(--color-primary);
 }
 
-/* ===== 按钮 ===== */
 .btn-primary {
   padding: 8px 20px;
   background: var(--color-primary);
@@ -924,7 +950,6 @@ onMounted(async () => {
   border-color: var(--color-primary);
 }
 
-/* ===== 题目列表 ===== */
 .problem-list-body {
   display: flex;
   flex-direction: column;
@@ -1003,7 +1028,6 @@ onMounted(async () => {
   color: var(--color-text-secondary);
 }
 
-/* ===== 空状态 ===== */
 .empty-card {
   padding: 60px 20px;
   text-align: center;
@@ -1014,7 +1038,6 @@ onMounted(async () => {
   font-size: var(--font-size-body);
 }
 
-/* ===== 分页 ===== */
 .pagination {
   margin-top: var(--spacing-lg);
   display: flex;
@@ -1029,7 +1052,6 @@ onMounted(async () => {
   color: var(--color-text-secondary);
 }
 
-/* ===== 分组视图 ===== */
 .group-list {
   display: flex;
   flex-direction: column;
@@ -1104,7 +1126,6 @@ onMounted(async () => {
   box-shadow: none;
 }
 
-/* ===== 导入对话框 ===== */
 .modal-mask {
   position: fixed;
   inset: 0;
@@ -1253,7 +1274,6 @@ onMounted(async () => {
   word-break: break-all;
 }
 
-/* ===== 响应式 ===== */
 @media (max-width: 600px) {
   .problem-list {
     padding: var(--spacing-lg) var(--spacing-md);
@@ -1293,7 +1313,6 @@ onMounted(async () => {
   }
 }
 
-/* 管理员操作按钮 */
 .admin-actions {
   display: flex;
   gap: 8px;
@@ -1319,5 +1338,4 @@ onMounted(async () => {
   color: var(--color-danger-text);
   border-color: var(--color-danger-text);
 }
-
 </style>
