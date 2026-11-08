@@ -6,6 +6,11 @@
     <div v-else :class="['content-wrapper', { 'focus-mode': isFocusMode }]">
       <!-- ========== 左栏：题目描述 ========== -->
       <div class="left-col">
+        <!-- 离线提示 -->
+        <div v-if="isOffline" class="offline-alert">
+          当前处于离线模式，显示的是缓存的题目数据。
+        </div>
+
         <article class="card problem-card">
           <header class="problem-header">
             <h1 class="title">{{ problem.title }}</h1>
@@ -463,6 +468,7 @@ import { uploadUserImage } from '../api/image'
 import { openSubmissionWS, type SubmissionWSHandle, type WSMessage } from '../utils/ws'
 import { useUserStore } from '../stores/user'
 import { loadDraft, saveDraft, clearDraft, type DraftImage } from '../utils/draft'
+import { setCache, getCache } from '../utils/cache' // 【离线缓存】
 
 const route = useRoute()
 const userStore = useUserStore()
@@ -470,6 +476,7 @@ const userStore = useUserStore()
 const problemId = computed(() => Number(route.params.id))
 
 const loading = ref(true)
+const isOffline = ref(false) // 【离线标记】
 const problem = ref<ProblemDetail | null>(null)
 
 const answer = ref<{ answer?: string | null; explanation?: string | null } | null>(null)
@@ -583,67 +590,105 @@ function languageLabel(lang: string): string {
   return lang
 }
 
+// 【抽离】恢复草稿的逻辑
+function restoreDraft(data: ProblemDetail) {
+  const draft = loadDraft(data.id)
+
+  if (data.type === 'fill_blank') {
+    const total = Array.isArray(data.blanks) ? data.blanks.length : 0
+    const saved = Array.isArray(draft.fillBlanks) ? draft.fillBlanks : []
+    fillBlanks.value = new Array(total).fill('').map((_, i) => saved[i] ?? '')
+  } else {
+    fillBlanks.value = []
+  }
+
+  if (data.type === 'algorithm') {
+    submitPanel.language = draft.language || 'python'
+    submitPanel.code = draft.code || ''
+  } else {
+    submitPanel.language = 'python'
+    submitPanel.code = ''
+  }
+
+  if (data.type === 'choice') {
+    choiceSelected.value = draft.choiceSelected || ''
+  } else {
+    choiceSelected.value = ''
+  }
+
+  if (data.type === 'proof') {
+    proofText.value = draft.proofText || ''
+    proofImages.value = Array.isArray(draft.proofImages) ? draft.proofImages : []
+  } else {
+    proofText.value = ''
+    proofImages.value = []
+  }
+}
+
 async function loadProblem() {
-  loading.value = true
+  const cacheKeyDetail = `oj_problem_detail_${problemId.value}`
+  const cacheKeyAnswer = `oj_problem_answer_${problemId.value}`
+
+  // 1. 【离线优先】立刻读取缓存并渲染
+  const cachedDetail = getCache<ProblemDetail>(cacheKeyDetail)
+  if (cachedDetail) {
+    problem.value = cachedDetail
+    isOffline.value = true
+    loading.value = false
+    
+    // 如果缓存有答案，直接显示
+    const cachedAns = getCache<any>(cacheKeyAnswer)
+    if (cachedAns) {
+      answer.value = cachedAns
+    }
+    
+    restoreDraft(cachedDetail)
+    console.log('[Offline-First] 详情页已瞬间渲染本地缓存')
+  } else {
+    loading.value = true
+  }
+
+  // 2. 发起后台网络请求
   try {
     const data = await getProblemDetail(problemId.value)
     problem.value = data
-
-    const draft = loadDraft(data.id)
-
-    // 填空题初始化输入数组
-    if (data.type === 'fill_blank') {
-      const total = Array.isArray(data.blanks) ? data.blanks.length : 0
-      const saved = Array.isArray(draft.fillBlanks) ? draft.fillBlanks : []
-      fillBlanks.value = new Array(total).fill('').map((_, i) => saved[i] ?? '')
-    } else {
-      fillBlanks.value = []
+    setCache(cacheKeyDetail, data) // 成功则更新缓存
+    
+    // 尝试获取答案（新接口）
+    try {
+      const ansData = await getProblemAnswer(problemId.value)
+      answer.value = ansData
+      setCache(cacheKeyAnswer, ansData)
+    } catch (e) {
+      console.warn('获取答案失败', e)
     }
 
-    // 恢复草稿：算法题
-    if (data.type === 'algorithm') {
-      submitPanel.language = draft.language || 'python'
-      submitPanel.code = draft.code || ''
-    } else {
-      submitPanel.language = 'python'
-      submitPanel.code = ''
-    }
-
-    // 恢复草稿：选择题
-    if (data.type === 'choice') {
-      choiceSelected.value = draft.choiceSelected || ''
-    } else {
-      choiceSelected.value = ''
-    }
-
-    // 恢复草稿：证明题
-    if (data.type === 'proof') {
-      proofText.value = draft.proofText || ''
-      proofImages.value = Array.isArray(draft.proofImages) ? draft.proofImages : []
-    } else {
-      proofText.value = ''
-      proofImages.value = []
-    }
+    restoreDraft(data)
+    isOffline.value = false
   } catch (e) {
-    console.error('加载题目失败', e)
-    problem.value = null
-    fillBlanks.value = []
-    proofText.value = ''
-    proofImages.value = []
-    submitPanel.code = ''
-    choiceSelected.value = ''
+    console.warn('加载题目失败，处于离线状态', e)
+    if (!cachedDetail) {
+      problem.value = null
+    }
+    isOffline.value = true
   } finally {
     loading.value = false
   }
 }
 
 async function showAnswer() {
+  answerVisible.value = true
+  if (answer.value) return // 如果已经有答案了（从缓存或之前拉取的），直接返回
+  
   try {
     const data = await getProblemAnswer(problemId.value)
     answer.value = data
-    answerVisible.value = true
+    setCache(`oj_problem_answer_${problemId.value}`, data)
   } catch (e) {
     console.error('加载答案失败', e)
+    if (!answer.value) {
+      alert('获取答案失败，请检查网络连接')
+    }
   }
 }
 
@@ -668,7 +713,6 @@ async function loadMySubmissions() {
 function formatTime(s: string): string {
   if (!s) return '-'
   try {
-    // 如果后端返回的时间没有带 'Z'（UTC 标识），手动补上，让浏览器按 UTC 解析并转换为本地时间
     let timeStr = s
     if (!timeStr.endsWith('Z') && !timeStr.includes('+')) {
       timeStr = timeStr.replace(' ', 'T') + 'Z'
@@ -685,14 +729,12 @@ function formatTime(s: string): string {
 
 // ===== 横屏代码模式 =====
 async function toggleFocusMode() {
-  // 如果当前是准备进入横屏，且是手机设备，给出提示
   if (!isFocusMode.value) {
     const isPhone = /Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) 
                     && navigator.userAgent.indexOf('iPad') === -1
-                    
     if (isPhone) {
       if (!window.confirm('提示：因手机屏幕较小，软键盘会遮挡部分视野，推荐在平板或电脑端使用横屏代码模式。\n\n是否仍要进入？')) {
-        return // 用户取消，不进入横屏
+        return
       }
     }
   }
@@ -755,7 +797,6 @@ function onClearDraft() {
   }
 }
 
-// 监听所有输入变化，debounce 保存草稿
 watch(
   [
     () => submitPanel.language,
@@ -769,7 +810,6 @@ watch(
   { deep: true }
 )
 
-// 组件卸载时立即保存一次
 onUnmounted(() => {
   if (draftTimer) {
     window.clearTimeout(draftTimer)
@@ -795,8 +835,6 @@ onUnmounted(() => {
     wsHandle.value.close()
     wsHandle.value = null
   }
-  
-  // 如果卸载时还在强制横屏，解除锁定
   if (isFocusMode.value && Capacitor.isNativePlatform()) {
     ScreenOrientation.unlock().catch(() => {})
   }
@@ -805,26 +843,16 @@ onUnmounted(() => {
 // ===== 算法题提交 =====
 async function onSubmit() {
   submitError.value = ''
-
-  if (!userStore.isLoggedIn) {
-    submitError.value = '请先登录'
-    return
-  }
-
-  if (!submitPanel.code.trim()) {
-    submitError.value = '代码不能为空'
-    return
-  }
+  if (!userStore.isLoggedIn) { submitError.value = '请先登录'; return }
+  if (!submitPanel.code.trim()) { submitError.value = '代码不能为空'; return }
 
   submitting.value = true
-
   try {
     const sub = await submitCode({
       problem_id: problemId.value,
       code: submitPanel.code,
       language: submitPanel.language,
     })
-
     currentSubmission.value = sub
     openWS(sub.id)
     loadMySubmissions()
@@ -843,25 +871,16 @@ async function onSubmit() {
 // ===== 选择题提交 =====
 async function onSubmitChoice() {
   submitError.value = ''
-
-  if (!userStore.isLoggedIn) {
-    submitError.value = '请先登录'
-    return
-  }
-  if (!choiceSelected.value) {
-    submitError.value = '请选择一个选项'
-    return
-  }
+  if (!userStore.isLoggedIn) { submitError.value = '请先登录'; return }
+  if (!choiceSelected.value) { submitError.value = '请选择一个选项'; return }
 
   submitting.value = true
-
   try {
     const sub = await submitCode({
       problem_id: problemId.value,
       language: 'choice',
       answer_data: { selected: choiceSelected.value },
     })
-
     currentSubmission.value = sub
     loadMySubmissions()
   } catch (e: any) {
@@ -879,25 +898,16 @@ async function onSubmitChoice() {
 // ===== 填空题提交 =====
 async function onSubmitFillBlank() {
   submitError.value = ''
-
-  if (!userStore.isLoggedIn) {
-    submitError.value = '请先登录'
-    return
-  }
-  if (!hasAnyBlankFilled.value) {
-    submitError.value = '请至少填写一个空'
-    return
-  }
+  if (!userStore.isLoggedIn) { submitError.value = '请先登录'; return }
+  if (!hasAnyBlankFilled.value) { submitError.value = '请至少填写一个空'; return }
 
   submitting.value = true
-
   try {
     const sub = await submitCode({
       problem_id: problemId.value,
       language: 'fill_blank',
       answer_data: { blanks: fillBlanks.value.map((s) => (s ?? '').trim()) },
     })
-
     currentSubmission.value = sub
     loadMySubmissions()
   } catch (e: any) {
@@ -942,18 +952,10 @@ function removeProofImage(id: number) {
 
 async function onSubmitProof() {
   submitError.value = ''
-
-  if (!userStore.isLoggedIn) {
-    submitError.value = '请先登录'
-    return
-  }
-  if (!canSubmitProof.value) {
-    submitError.value = '请填写证明过程或上传图片'
-    return
-  }
+  if (!userStore.isLoggedIn) { submitError.value = '请先登录'; return }
+  if (!canSubmitProof.value) { submitError.value = '请填写证明过程或上传图片'; return }
 
   submitting.value = true
-
   try {
     const sub = await submitCode({
       problem_id: problemId.value,
@@ -963,7 +965,6 @@ async function onSubmitProof() {
         images: proofImages.value.map((img) => img.id),
       },
     })
-
     currentSubmission.value = sub
     loadMySubmissions()
   } catch (e: any) {
@@ -1035,6 +1036,16 @@ onMounted(() => {
   text-align: center;
   padding: 60px 0;
   color: var(--color-text-muted);
+}
+
+.offline-alert {
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  margin-bottom: var(--spacing-md);
+  font-size: 14px;
+  border: 1px solid var(--color-warning-text);
 }
 
 /* ===== 两栏布局 ===== */
