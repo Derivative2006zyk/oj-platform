@@ -28,7 +28,7 @@ MANIFEST = {
     "description": "基于 PaddleOCR + pix2tex 的本地离线公式识别。安装后会拉起 GPU 微服务。",
     "ui_manifest": {
         "menu_name": "拍照录题",
-        "route_path": "/ocr",
+        "route_path": "/plugin/ocr_plugin",
         "icon": "camera",
         "order": 10,
     },
