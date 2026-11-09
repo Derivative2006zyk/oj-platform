@@ -1,4 +1,5 @@
 import api from '../utils/axios'
+import { enqueueAction } from '../utils/offline-queue'
 
 // 分类
 export interface Category {
@@ -84,26 +85,65 @@ export async function getProblemAnswer(id: number): Promise<{ answer: string; ex
 // 管理
 export async function createProblem(data: any): Promise<{ id: number }> {
   const adminKey = localStorage.getItem('admin_key') || ''
-  const res = await api.post('/admin/problems', data, {
-    headers: { 'X-Admin-Key': adminKey }
-  })
-  return res.data
+  try {
+    const res = await api.post('/admin/problems', data, {
+      headers: { 'X-Admin-Key': adminKey }
+    })
+    return res.data
+  } catch (e: any) {
+    const isNetworkError = !e.response || e.code === 'ERR_NETWORK' || e.code === 'ECONNABORTED' || e.message?.includes('timeout') || e.response?.status === 502
+    if (isNetworkError) {
+      throw new Error('当前无网络，无法新建题目。请联网后重试。')
+    }
+    throw e
+  }
 }
 
 export async function updateProblem(id: number, data: any): Promise<{ id: number }> {
   const adminKey = localStorage.getItem('admin_key') || ''
-  const res = await api.put(`/admin/problems/${id}`, data, {
-    headers: { 'X-Admin-Key': adminKey }
-  })
-  return res.data
+  
+  try {
+    const res = await api.put(`/admin/problems/${id}`, data, {
+      headers: { 'X-Admin-Key': adminKey }
+    })
+    return res.data
+  } catch (e: any) {
+    console.log('捕获到错误，准备判断是否离线：', e)
+    
+    // 如果是 409 冲突，直接抛出，让前端去提示刷新
+    if (e.response?.status === 409) {
+      throw e
+    }
+    
+    // 【暴力兜底】除了 409 版本冲突，任何报错（502、超时、断网）全给它扔进离线队列！
+    console.log('触发离线队列保存！')
+    enqueueAction({
+      id: Date.now().toString() + Math.random().toString(36).slice(2),
+      method: 'put',
+      url: `/admin/problems/${id}`,
+      data: data,
+      headers: { 'X-Admin-Key': adminKey },
+      description: `修改题目 #${id}`
+    })
+    
+    return { id, message: 'offline-saved' } as any
+  }
 }
 
 export async function deleteProblem(id: number): Promise<{ message: string }> {
   const adminKey = localStorage.getItem('admin_key') || ''
-  const res = await api.delete(`/admin/problems/${id}`, {
-    headers: { 'X-Admin-Key': adminKey }
-  })
-  return res.data
+  try {
+    const res = await api.delete(`/admin/problems/${id}`, {
+      headers: { 'X-Admin-Key': adminKey }
+    })
+    return res.data
+  } catch (e: any) {
+    const isNetworkError = !e.response || e.code === 'ERR_NETWORK' || e.code === 'ECONNABORTED' || e.message?.includes('timeout') || e.response?.status === 502
+    if (isNetworkError) {
+      throw new Error('当前无网络，无法删除题目。请联网后重试。')
+    }
+    throw e
+  }
 }
 
 // 图片
