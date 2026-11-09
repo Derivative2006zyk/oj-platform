@@ -192,6 +192,7 @@ import {
   type Category
 } from '../api/problem'
 import { listBanks, type Bank } from '../api/bank'
+import { getCache } from '../utils/cache' // 【新增】引入缓存工具
 
 const route = useRoute()
 const router = useRouter()
@@ -218,7 +219,7 @@ const form = reactive({
   options: [] as any[],
   blanks: [] as any[],
   subprojects: [] as any[],
-  version: 1
+  version: 1 // 【注意】乐观锁版本号
 })
 
 // ===================== 测试用例 =====================
@@ -311,7 +312,7 @@ function buildSubmitData() {
       .split(',')
       .map(t => t.trim())
       .filter(t => t),
-    version: form.version,
+    version: form.version // 【乐观锁】
   }
 
   if (form.type === 'algorithm') {
@@ -397,18 +398,26 @@ async function submit() {
   submitting.value = true
   try {
     if (isEdit.value) {
-      await updateProblem(Number(route.params.id), data)
-      alert('更新成功')
+      const res = await updateProblem(Number(route.params.id), data)
+      
+      // 【离线支持】检查是否是离线保存
+      if (res && (res as any).message === 'offline-saved') {
+        alert('当前无网络，修改已保存至本地队列。网络恢复后将自动同步。')
+      } else {
+        alert('更新成功')
+      }
     } else {
       await createProblem(data)
       alert('创建成功')
     }
     router.push('/')
   } catch (e: any) {
-    if (e.response?.status === 409){
-      alert(e.response.data.detail || '该题目已被其他设备修改，请刷新后重试。')
+    // 【冲突处理】处理乐观锁 409 冲突
+    if (e.response?.status === 409) {
+      alert(e.response.data.detail || '保存失败：该题目已被其他设备修改，请刷新后重试。')
       return
     }
+    
     const msg = e.response?.data?.detail || e.message || '保存失败'
     alert('保存失败：' + msg)
   } finally {
@@ -420,15 +429,71 @@ function cancel() {
   router.push('/')
 }
 
-// ===================== 初始化 =====================
+// ===================== 数据回填 =====================
+function applyDetailToForm(detail: any) {
+  form.title = detail.title || ''
+  form.category_id = detail.category_id || 1
+  form.bank_id = detail.bank_id ?? null
+  form.type = detail.type || 'algorithm'
+  form.difficulty = detail.difficulty || 1
+  form.description = detail.description || ''
+  form.explanation = detail.explanation || ''
+  tagsInput.value = Array.isArray(detail.tags) ? detail.tags.join(',') : ''
+  form.version = detail.version || 1 // 回填 version
+
+  if (detail.type === 'algorithm') {
+    form.test_cases = Array.isArray(detail.test_cases)
+      ? detail.test_cases.map((tc: any) => ({
+          input_data: tc.input_data || '',
+          expected_output: tc.expected_output || '',
+          is_example: true
+        }))
+      : []
+  } else if (detail.type === 'choice') {
+    form.options = Array.isArray(detail.options)
+      ? detail.options.map((o: any) => ({
+          key: o.key || '',
+          content: o.content || '',
+          is_correct: !!o.is_correct
+        }))
+      : []
+  } else if (detail.type === 'fill_blank') {
+    form.blanks = Array.isArray(detail.blanks)
+      ? detail.blanks.map((b: any) => ({
+          answers_text: Array.isArray(b.correct_answers)
+            ? b.correct_answers.join('|')
+            : ''
+        }))
+      : []
+  } else if (detail.type === 'research') {
+    form.subprojects = Array.isArray(detail.subprojects)
+      ? detail.subprojects.map((sp: any) => ({
+          title: sp.title || '',
+          description: sp.description || '',
+          hint: sp.hint || '',
+          reference_links: Array.isArray(sp.reference_links)
+            ? sp.reference_links.map((r: any) => ({
+                title: r.title || '',
+                url: r.url || '',
+                note: r.note || ''
+              }))
+            : [],
+          answer_guide: sp.answer_guide || '',
+          sort_order: sp.sort_order || 0
+        }))
+      : []
+  }
+}
+
+// ===================== 初始化（离线优先） =====================
 onMounted(async () => {
+  // 1. 拉取分类和题库（如果断网则静默失败，不阻断后续流程）
   try {
     const [cats, bs] = await Promise.all([getCategories(), listBanks()])
     categories.value = Array.isArray(cats) ? cats : []
     banks.value = Array.isArray(bs) ? bs : []
   } catch (e) {
-    alert('无法连接到服务器，请确认后端已启动')
-    return
+    console.warn('加载分类或题库失败，可能处于离线状态，不影响编辑')
   }
 
   if (!isEdit.value) return
@@ -440,60 +505,17 @@ onMounted(async () => {
     return
   }
 
+  // 2. 先尝试从缓存读取详情并渲染
+  const cacheKeyDetail = `oj_problem_detail_${id}`
+  const cachedDetail = getCache<any>(cacheKeyDetail)
+  if (cachedDetail) {
+    applyDetailToForm(cachedDetail)
+  }
+
+  // 3. 发起网络请求更新数据
   try {
     const detail = await getProblemDetail(id)
-    form.title = detail.title || ''
-    form.category_id = detail.category_id || 1
-    form.bank_id = (detail as any).bank_id ?? null
-    form.type = detail.type || 'algorithm'
-    form.difficulty = detail.difficulty || 1
-    form.description = detail.description || ''
-    form.explanation = detail.explanation || ''
-    form.version = (detail as any).version || 1
-    tagsInput.value = Array.isArray(detail.tags) ? detail.tags.join(',') : ''
-
-    if (detail.type === 'algorithm') {
-      form.test_cases = Array.isArray(detail.test_cases)
-        ? detail.test_cases.map(tc => ({
-            input_data: tc.input_data || '',
-            expected_output: tc.expected_output || '',
-            is_example: true
-          }))
-        : []
-    } else if (detail.type === 'choice') {
-      form.options = Array.isArray(detail.options)
-        ? detail.options.map((o: any) => ({
-            key: o.key || '',
-            content: o.content || '',
-            is_correct: !!o.is_correct
-          }))
-        : []
-    } else if (detail.type === 'fill_blank') {
-      form.blanks = Array.isArray(detail.blanks)
-        ? detail.blanks.map((b: any) => ({
-            answers_text: Array.isArray(b.correct_answers)
-              ? b.correct_answers.join('|')
-              : ''
-          }))
-        : []
-    } else if (detail.type === 'research') {
-      form.subprojects = Array.isArray(detail.subprojects)
-        ? detail.subprojects.map((sp: any) => ({
-            title: sp.title || '',
-            description: sp.description || '',
-            hint: sp.hint || '',
-            reference_links: Array.isArray(sp.reference_links)
-              ? sp.reference_links.map((r: any) => ({
-                  title: r.title || '',
-                  url: r.url || '',
-                  note: r.note || ''
-                }))
-              : [],
-            answer_guide: sp.answer_guide || '',
-            sort_order: sp.sort_order || 0
-          }))
-        : []
-    }
+    applyDetailToForm(detail)
 
     try {
       const answerData = await getProblemAnswer(id)
@@ -502,11 +524,19 @@ onMounted(async () => {
         form.explanation = answerData.explanation
       }
     } catch (e) {
-      console.warn('获取答案失败', e)
+      // 如果答案接口失败，尝试读缓存
+      const cachedAns = getCache<any>(`oj_problem_answer_${id}`)
+      if (cachedAns) {
+        form.answer = cachedAns.answer || ''
+        form.explanation = cachedAns.explanation || ''
+      }
     }
   } catch (e) {
-    alert('题目不存在')
-    router.push('/')
+    console.warn('获取网络详情失败，可能处于离线状态')
+    if (!cachedDetail) {
+      alert('获取题目失败且无本地缓存')
+      router.push('/')
+    }
   }
 })
 </script>

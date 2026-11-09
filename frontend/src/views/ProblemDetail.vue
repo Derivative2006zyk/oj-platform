@@ -468,7 +468,7 @@ import { uploadUserImage } from '../api/image'
 import { openSubmissionWS, type SubmissionWSHandle, type WSMessage } from '../utils/ws'
 import { useUserStore } from '../stores/user'
 import { loadDraft, saveDraft, clearDraft, type DraftImage } from '../utils/draft'
-import { setCache, getCache } from '../utils/cache' // 【离线缓存】
+import { setCache, getCache } from '../utils/cache'
 
 const route = useRoute()
 const userStore = useUserStore()
@@ -476,7 +476,7 @@ const userStore = useUserStore()
 const problemId = computed(() => Number(route.params.id))
 
 const loading = ref(true)
-const isOffline = ref(false) // 【离线标记】
+const isOffline = ref(false)
 const problem = ref<ProblemDetail | null>(null)
 
 const answer = ref<{ answer?: string | null; explanation?: string | null } | null>(null)
@@ -576,6 +576,7 @@ function statusLabel(status: string): string {
     RE: '运行错误',
     CE: '编译错误',
     SUBMITTED: '已提交',
+    OFFLINE_PENDING: '待同步(离线)', // 【新增】
   }
   return map[status] || status
 }
@@ -590,7 +591,6 @@ function languageLabel(lang: string): string {
   return lang
 }
 
-// 【抽离】恢复草稿的逻辑
 function restoreDraft(data: ProblemDetail) {
   const draft = loadDraft(data.id)
 
@@ -629,14 +629,12 @@ async function loadProblem() {
   const cacheKeyDetail = `oj_problem_detail_${problemId.value}`
   const cacheKeyAnswer = `oj_problem_answer_${problemId.value}`
 
-  // 1. 【离线优先】立刻读取缓存并渲染
   const cachedDetail = getCache<ProblemDetail>(cacheKeyDetail)
   if (cachedDetail) {
     problem.value = cachedDetail
     isOffline.value = true
     loading.value = false
     
-    // 如果缓存有答案，直接显示
     const cachedAns = getCache<any>(cacheKeyAnswer)
     if (cachedAns) {
       answer.value = cachedAns
@@ -648,13 +646,11 @@ async function loadProblem() {
     loading.value = true
   }
 
-  // 2. 发起后台网络请求
   try {
     const data = await getProblemDetail(problemId.value)
     problem.value = data
-    setCache(cacheKeyDetail, data) // 成功则更新缓存
+    setCache(cacheKeyDetail, data)
     
-    // 尝试获取答案（新接口）
     try {
       const ansData = await getProblemAnswer(problemId.value)
       answer.value = ansData
@@ -678,7 +674,7 @@ async function loadProblem() {
 
 async function showAnswer() {
   answerVisible.value = true
-  if (answer.value) return // 如果已经有答案了（从缓存或之前拉取的），直接返回
+  if (answer.value) return
   
   try {
     const data = await getProblemAnswer(problemId.value)
@@ -854,6 +850,13 @@ async function onSubmit() {
       language: submitPanel.language,
     })
     currentSubmission.value = sub
+
+    // 【离线拦截】
+    if (sub.status === 'OFFLINE_PENDING') {
+      alert('当前处于离线状态，代码已保存至本地。联网后将自动提交评测。')
+      return
+    }
+
     openWS(sub.id)
     loadMySubmissions()
   } catch (e: any) {
@@ -882,6 +885,13 @@ async function onSubmitChoice() {
       answer_data: { selected: choiceSelected.value },
     })
     currentSubmission.value = sub
+
+    // 【离线拦截】
+    if (sub.status === 'OFFLINE_PENDING') {
+      alert('当前处于离线状态，答案已保存至本地。联网后将自动提交评测。')
+      return
+    }
+
     loadMySubmissions()
   } catch (e: any) {
     const status = e?.response?.status
@@ -909,6 +919,13 @@ async function onSubmitFillBlank() {
       answer_data: { blanks: fillBlanks.value.map((s) => (s ?? '').trim()) },
     })
     currentSubmission.value = sub
+
+    // 【离线拦截】
+    if (sub.status === 'OFFLINE_PENDING') {
+      alert('当前处于离线状态，答案已保存至本地。联网后将自动提交评测。')
+      return
+    }
+
     loadMySubmissions()
   } catch (e: any) {
     const status = e?.response?.status
@@ -966,6 +983,13 @@ async function onSubmitProof() {
       },
     })
     currentSubmission.value = sub
+
+    // 【离线拦截】
+    if (sub.status === 'OFFLINE_PENDING') {
+      alert('当前处于离线状态，证明内容已保存至本地。联网后将自动提交。')
+      return
+    }
+
     loadMySubmissions()
   } catch (e: any) {
     const status = e?.response?.status
