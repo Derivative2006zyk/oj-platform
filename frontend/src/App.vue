@@ -7,6 +7,28 @@
 
 <script setup lang="ts">
 import NavBar from './components/NavBar.vue'
+import { onMounted, onUnmounted } from 'vue'
+import { initOfflineQueue, processQueue } from './utils/offline-queue'
+
+let syncHandler: () => void
+
+onMounted(() => {
+  initOfflineQueue()
+  // 如果启动时正好有网，尝试同步一次（防止上次断网没发出去的）
+  if (navigator.onLine) {
+    processQueue()
+  }
+  
+  // 监听同步完成事件，如果在某些特定页面可能需要刷新数据
+  syncHandler = () => {
+    console.log('检测到队列同步完成，当前页面数据将更新')
+  }
+  window.addEventListener('offline-queue-synced', syncHandler)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('offline-queue-synced', syncHandler)
+})
 </script>
 
 <style>
