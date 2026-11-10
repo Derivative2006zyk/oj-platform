@@ -13,7 +13,7 @@
           </template>
         </template>
         
-        <!-- 动态插件菜单（增加 v-if 过滤禁用插件） -->
+        <!-- 动态插件菜单 -->
         <template v-for="p in pluginStore.plugins" :key="p.name">
           <router-link
             v-if="p.enabled !== false"
@@ -26,6 +26,11 @@
       </nav>
 
       <div class="right-section">
+        <!-- 主题切换按钮 -->
+        <button class="theme-toggle" @click="toggleTheme" :title="isDark ? '切换亮色' : '切换暗色'">
+          {{ isDark ? '亮色' : '暗色' }}
+        </button>
+
         <template v-if="userStore.isLoggedIn">
           <router-link to="/profile" class="user-area">
             <div class="avatar">
@@ -51,7 +56,7 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
-import { onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { usePluginStore } from '../stores/plugin'
 
 const pluginStore = usePluginStore()
@@ -67,6 +72,25 @@ function onLogout() {
   userStore.logout()
   router.push('/')
 }
+
+// ===== 主题切换逻辑 =====
+const isDark = ref(false)
+
+onMounted(() => {
+  // 初始化状态
+  isDark.value = document.documentElement.hasAttribute('data-theme')
+})
+
+function toggleTheme() {
+  isDark.value = !isDark.value
+  if (isDark.value) {
+    document.documentElement.setAttribute('data-theme', 'dark')
+    localStorage.setItem('oj_theme', 'dark')
+  } else {
+    document.documentElement.removeAttribute('data-theme')
+    localStorage.setItem('oj_theme', 'light')
+  }
+}
 </script>
 
 <style scoped>
@@ -81,6 +105,7 @@ function onLogout() {
   box-shadow: var(--shadow-nav);
   border-bottom: 1px solid var(--color-border-light);
   width: 100%;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .navbar-content {
@@ -134,7 +159,8 @@ function onLogout() {
 }
 
 .nav-link:hover {
-  background: rgba(0, 0, 0, 0.04);
+  /* 使用 CSS 变量代替写死的 rgba(0,0,0) 保证暗色下正常 */
+  background: var(--color-primary-light);
   color: var(--color-text-primary);
 }
 
@@ -155,6 +181,24 @@ function onLogout() {
   flex-shrink: 0;
 }
 
+/* ===== 主题切换按钮 ===== */
+.theme-toggle {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-md);
+  padding: 4px 10px;
+  font-size: 13px;
+  cursor: pointer;
+  margin-right: 8px;
+  transition: all 0.2s;
+}
+.theme-toggle:hover {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
 .user-area {
   display: flex;
   align-items: center;
@@ -166,7 +210,7 @@ function onLogout() {
 }
 
 .user-area:hover {
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--color-primary-light);
 }
 
 .avatar {
@@ -219,6 +263,11 @@ function onLogout() {
   .nav-link {
     font-size: 13px;
     padding: 6px;
+  }
+
+  .theme-toggle {
+    padding: 4px 6px;
+    font-size: 12px;
   }
 }
 </style>

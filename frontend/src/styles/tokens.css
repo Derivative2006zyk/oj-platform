@@ -68,3 +68,68 @@
   --radius-md: 8px;
   --radius-lg: 12px;
 }
+
+/* =========================================
+   暗色模式覆盖 (Dark Theme) - 极暗终端风
+   ========================================= */
+[data-theme="dark"] {
+  /* 【核心修复】告诉浏览器这是深色网站，禁止浏览器插件强行反色 */
+  color-scheme: dark;
+
+  /* 背景和卡片：接近终端的黑色，卡片用稍浅的深灰区分层级 */
+  --color-bg-page: #0a0a0a;
+  --color-bg-card: #151515;
+  --color-nav-bg: rgba(10, 10, 10, 0.85);
+  
+  /* 文本：必须是浅灰白，才能在黑底上看清 */
+  --color-text-primary: #f0f0f0; 
+  --color-text-secondary: #a0a0a0;
+  --color-text-muted: #808080;
+  
+  /* 边框 */
+  --color-border: #333333;
+  --color-border-light: #222222;
+  
+  /* 主色 */
+  --color-primary: #3b82f6;
+  --color-primary-hover: #60a5fa;
+  --color-primary-disabled: #1e3a8a;
+  --color-primary-light: #1e293b;
+  --color-primary-text: #ffffff;
+  --color-link: #60a5fa;
+
+  /* 语义化背景 */
+  --color-tag-bg: #2a2a2a;
+  --color-tag-text: #93c5fd;
+  --color-sample-bg: #121212;
+  --color-sample-code-bg: #0a0a0a;
+  --color-sample-code-border: #333333;
+  --color-code-bg: #1a1a1a;
+  --color-editor-header-bg: #1a1a1a;
+  --color-editor-body-bg: #121212;
+
+  /* 状态色 */
+  --color-success-bg: rgba(16, 185, 129, 0.15);
+  --color-success-text: #34d399;
+  --color-danger-bg: rgba(239, 68, 68, 0.15);
+  --color-danger-text: #f87171;
+  --color-warning-bg: rgba(245, 158, 11, 0.15);
+  --color-warning-text: #fbbf24;
+  --color-neutral-bg: #2a2a2a;
+  --color-neutral-text: #e0e0e0;
+
+  /* 阴影 */
+  --shadow-nav: 0 1px 4px rgba(0, 0, 0, 0.6);
+  --shadow-card: 0 1px 4px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+/* 强制覆盖暗色下所有输入框和按钮的默认黑底黑字 */
+[data-theme="dark"] input,
+[data-theme="dark"] textarea,
+[data-theme="dark"] select,
+[data-theme="dark"] button {
+  background-color: var(--color-bg-card) !important;
+  color: var(--color-text-primary) !important;
+  border-color: var(--color-border) !important;
+}
