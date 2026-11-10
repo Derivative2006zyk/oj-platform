@@ -576,7 +576,7 @@ function statusLabel(status: string): string {
     RE: '运行错误',
     CE: '编译错误',
     SUBMITTED: '已提交',
-    OFFLINE_PENDING: '待同步(离线)', // 【新增】
+    OFFLINE_PENDING: '待同步(离线)',
   }
   return map[status] || status
 }
@@ -851,7 +851,6 @@ async function onSubmit() {
     })
     currentSubmission.value = sub
 
-    // 【离线拦截】
     if (sub.status === 'OFFLINE_PENDING') {
       alert('当前处于离线状态，代码已保存至本地。联网后将自动提交评测。')
       return
@@ -886,7 +885,6 @@ async function onSubmitChoice() {
     })
     currentSubmission.value = sub
 
-    // 【离线拦截】
     if (sub.status === 'OFFLINE_PENDING') {
       alert('当前处于离线状态，答案已保存至本地。联网后将自动提交评测。')
       return
@@ -920,7 +918,6 @@ async function onSubmitFillBlank() {
     })
     currentSubmission.value = sub
 
-    // 【离线拦截】
     if (sub.status === 'OFFLINE_PENDING') {
       alert('当前处于离线状态，答案已保存至本地。联网后将自动提交评测。')
       return
@@ -984,7 +981,6 @@ async function onSubmitProof() {
     })
     currentSubmission.value = sub
 
-    // 【离线拦截】
     if (sub.status === 'OFFLINE_PENDING') {
       alert('当前处于离线状态，证明内容已保存至本地。联网后将自动提交。')
       return
@@ -1053,6 +1049,7 @@ onMounted(() => {
 <style scoped>
 .problem-page {
   padding: var(--spacing-xl) 0;
+  min-height: calc(100vh - 56px);
 }
 
 .loading,
@@ -1100,7 +1097,6 @@ onMounted(() => {
 /* ===== 沉浸式横屏代码模式 ===== */
 .content-wrapper.focus-mode {
   flex-wrap: nowrap;
-  /* 使用 dvh 适配动态视口高度 */
   height: calc(100dvh - 56px);
   padding: 0;
   margin: 0;
@@ -1126,7 +1122,6 @@ onMounted(() => {
   background: var(--color-bg-card);
 }
 
-/* 注意：这里千万不能隐藏 card-header */
 .content-wrapper.focus-mode .submit-panel > .card-header {
   display: flex !important;
   justify-content: space-between;
@@ -1135,11 +1130,9 @@ onMounted(() => {
   padding: 10px 16px;
   border-bottom: 1px solid var(--color-border-light);
   flex-shrink: 0;
-  /* 防止被上方导航栏遮挡 */
   z-index: 10;
 }
 
-/* 隐藏横屏下不需要的辅助元素 */
 .content-wrapper.focus-mode .form-row,
 .content-wrapper.focus-mode .info-card,
 .content-wrapper.focus-mode .back-link,
@@ -1147,7 +1140,6 @@ onMounted(() => {
   display: none !important;
 }
 
-/* 编辑器占满中间全部剩余空间 */
 .content-wrapper.focus-mode .editor-wrapper {
   flex: 1;
   min-height: 0;
@@ -1158,7 +1150,6 @@ onMounted(() => {
   border: none;
 }
 
-/* 提交按钮和结果固定在底部并留出空间 */
 .content-wrapper.focus-mode > .submit-panel > .btn-primary {
   margin: 12px 16px;
   border-radius: var(--radius-md);
@@ -1274,8 +1265,8 @@ onMounted(() => {
 
 .tag-pill {
   padding: 2px 10px;
-  background: #eff6ff;
-  color: #1e40af;
+  background: var(--color-primary-light);
+  color: var(--color-primary);
   font-size: var(--font-size-small);
   border-radius: 12px;
 }
@@ -1423,6 +1414,7 @@ onMounted(() => {
   padding: 20px;
 }
 
+/* ===== 提交历史 ===== */
 .history-card {
   margin-top: var(--spacing-lg);
   overflow: hidden;
@@ -1507,7 +1499,7 @@ onMounted(() => {
 .history-lang {
   display: inline-block;
   padding: 1px 8px;
-  background: white;
+  background: var(--color-bg-card);
   border: 1px solid var(--color-border-light);
   border-radius: 10px;
   font-size: 11px;
@@ -1540,6 +1532,7 @@ onMounted(() => {
   }
 }
 
+/* ===== 提交面板 ===== */
 .submit-panel {
   overflow: visible;
 }
@@ -1587,6 +1580,7 @@ onMounted(() => {
   border-radius: var(--radius-md);
   font-size: 13px;
   background: var(--color-bg-card);
+  color: var(--color-text-primary);
   cursor: pointer;
   outline: none;
 }
@@ -1625,7 +1619,7 @@ onMounted(() => {
 }
 
 .btn-ghost:hover {
-  background: rgba(79, 70, 229, 0.06);
+  background: var(--color-primary-light);
 }
 
 .error {
@@ -1661,6 +1655,7 @@ onMounted(() => {
   color: var(--color-text-secondary);
 }
 
+/* 状态标签基础样式（亮色） */
 .status-badge {
   padding: 2px 10px;
   border-radius: var(--radius-sm);
@@ -1676,6 +1671,7 @@ onMounted(() => {
 .status-RE { background: var(--color-danger-bg); color: var(--color-danger-text); }
 .status-CE { background: var(--color-danger-bg); color: var(--color-danger-text); }
 .status-SUBMITTED { background: var(--color-primary-light); color: var(--color-primary); }
+.status-OFFLINE_PENDING { background: rgba(139, 92, 246, 0.2); color: #a78bfa; }
 
 .error-message {
   margin-top: 8px;
@@ -1737,6 +1733,8 @@ onMounted(() => {
   min-height: 200px;
   max-height: 800px;
   height: 360px;
+  /* 确保编辑器区域不会出现白色背景 */
+  background: var(--color-bg-card); 
 }
 
 .choice-options {
@@ -1937,5 +1935,40 @@ onMounted(() => {
   font-size: 12px;
   color: var(--color-text-muted);
   line-height: 1.5;
+}
+
+/* =========================================
+   暗色模式强制覆盖修复区
+   ========================================= */
+[data-theme="dark"] .submit-panel {
+  background: var(--color-bg-card);
+}
+
+[data-theme="dark"] .history-row {
+  background: #1e1e1e !important;
+  border: 1px solid #333 !important;
+}
+[data-theme="dark"] .history-row:hover {
+  background: #2a2a2a !important;
+}
+
+/* 状态标签在暗色下的高对比度修复 */
+[data-theme="dark"] .status-PENDING { background: rgba(156, 163, 175, 0.2) !important; color: #d1d5db !important; }
+[data-theme="dark"] .status-AC { background: rgba(16, 185, 129, 0.2) !important; color: #34d399 !important; }
+[data-theme="dark"] .status-WA { background: rgba(239, 68, 68, 0.2) !important; color: #f87171 !important; }
+[data-theme="dark"] .status-TLE { background: rgba(245, 158, 11, 0.2) !important; color: #fbbf24 !important; }
+[data-theme="dark"] .status-MLE { background: rgba(245, 158, 11, 0.2) !important; color: #fbbf24 !important; }
+[data-theme="dark"] .status-RE { background: rgba(239, 68, 68, 0.2) !important; color: #f87171 !important; }
+[data-theme="dark"] .status-CE { background: rgba(239, 68, 68, 0.2) !important; color: #f87171 !important; }
+[data-theme="dark"] .status-SUBMITTED { background: rgba(59, 130, 246, 0.2) !important; color: #60a5fa !important; }
+[data-theme="dark"] .status-OFFLINE_PENDING { background: rgba(139, 92, 246, 0.2) !important; color: #a78bfa !important; }
+
+[data-theme="dark"] .history-lang {
+  background: #1e1e1e;
+  border-color: #333;
+}
+
+[data-theme="dark"] .back-link:hover {
+  background: rgba(255, 255, 255, 0.05);
 }
 </style>

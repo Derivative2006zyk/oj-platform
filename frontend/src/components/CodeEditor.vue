@@ -60,6 +60,11 @@ const isMobile = computed(() => {
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
 })
 
+// 获取当前是否暗色主题
+function getCurrentTheme() {
+  return document.documentElement.hasAttribute('data-theme') ? 'vs-dark' : 'vs'
+}
+
 // ===== 移动端逻辑 =====
 const codeText = ref(props.modelValue)
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
@@ -78,7 +83,6 @@ function insertText(text: string) {
   const val = el.value
 
   if (text === '\t') {
-    // 插入 4 个空格代替 Tab
     el.value = val.substring(0, start) + '    ' + val.substring(end)
     el.selectionStart = el.selectionEnd = start + 4
   } else {
@@ -98,6 +102,7 @@ function insertText(text: string) {
 const editorContainer = ref<HTMLElement | null>(null)
 let editorInstance: monaco.editor.IStandaloneCodeEditor | null = null
 let resizeObserver: ResizeObserver | null = null
+let themeObserver: MutationObserver | null = null
 
 onMounted(() => {
   if (isMobile.value || !editorContainer.value) return
@@ -105,7 +110,7 @@ onMounted(() => {
   editorInstance = monaco.editor.create(editorContainer.value, {
     value: props.modelValue,
     language: props.language,
-    theme: 'vs',
+    theme: getCurrentTheme(), // 跟随全局主题
     automaticLayout: false,
     minimap: { enabled: false },
     scrollBeyondLastLine: false,
@@ -120,6 +125,7 @@ onMounted(() => {
     folding: false,
     renderLineHighlight: 'none',
     guides: { indentation: false },
+    padding: { top: 12, bottom: 12 }
   })
 
   editorInstance.onDidChangeModelContent(() => {
@@ -133,10 +139,21 @@ onMounted(() => {
     editorInstance?.layout()
   })
   resizeObserver.observe(editorContainer.value)
+
+  // 监听暗色模式切换
+  themeObserver = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.attributeName === 'data-theme') {
+        monaco.editor.setTheme(getCurrentTheme())
+      }
+    })
+  })
+  themeObserver.observe(document.documentElement, { attributes: true })
 })
 
 onUnmounted(() => {
   if (resizeObserver) resizeObserver.disconnect()
+  if (themeObserver) themeObserver.disconnect()
   if (editorInstance) {
     editorInstance.dispose()
     editorInstance = null
@@ -171,11 +188,14 @@ watch(() => props.language, (newLang) => {
   background: var(--color-bg-card);
   display: flex;
   flex-direction: column;
+  /* 统一边框颜色 */
+  border: 1px solid var(--color-border);
 }
 
 .monaco-container {
   width: 100%;
   height: 100%;
+  background: var(--color-bg-card);
 }
 
 /* 移动端编辑器容器 */
@@ -184,7 +204,7 @@ watch(() => props.language, (newLang) => {
   flex-direction: column;
   width: 100%;
   height: 100%;
-  background: #f9fafb;
+  background: var(--color-sample-bg);
 }
 
 /* 移动端输入框 */
@@ -196,9 +216,8 @@ watch(() => props.language, (newLang) => {
   resize: none;
   outline: none;
   background: transparent;
-  color: #1d1d1f;
+  color: var(--color-text-primary);
   font-family: 'Consolas', 'Monaco', monospace;
-  /* 针对 1440P 高分辨率屏幕，字号适当调大 */
   font-size: 15px;
   line-height: 1.6;
   box-sizing: border-box;
@@ -211,11 +230,10 @@ watch(() => props.language, (newLang) => {
   display: flex;
   gap: 8px;
   padding: 10px;
-  background: #e5e7eb;
-  border-top: 1px solid #d1d5db;
+  background: var(--color-bg-card);
+  border-top: 1px solid var(--color-border);
   overflow-x: auto;
   scrollbar-width: none;
-  /* 防止被键盘挤压 */
   flex-shrink: 0;
 }
 
@@ -225,18 +243,18 @@ watch(() => props.language, (newLang) => {
 
 .mobile-toolbar button {
   padding: 8px 14px;
-  background: white;
-  border: 1px solid #d1d5db;
+  background: var(--color-bg-page);
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   font-family: monospace;
   font-size: 16px;
-  color: #374151;
+  color: var(--color-text-primary);
   white-space: nowrap;
   box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
 
 .mobile-toolbar button:active {
-  background: #e5e7eb;
+  background: var(--color-primary-light);
   transform: translateY(1px);
 }
 </style>
