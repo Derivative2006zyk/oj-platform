@@ -160,8 +160,16 @@ class PluginRegistry:
                         with open(manifest_file, "r", encoding="utf-8") as f:
                             data = json.load(f)
                             data["folder_name"] = item.name
-                            data["name"] = item.name # 强制统一
-                            data["enabled"] = configs[item.name].enabled if item.name in configs else True
+                            data["name"] = item.name
+                            
+                            # 获取数据库配置
+                            db_cfg = configs.get(item.name)
+                            data["enabled"] = db_cfg.enabled if db_cfg else True
+                            
+                            # 【新增】提取 show_in_nav 配置（默认 True）
+                            plugin_config = db_cfg.config if db_cfg and db_cfg.config else {}
+                            data["show_in_nav"] = plugin_config.get("show_in_nav", True)
+                            
                             results.append(data)
                     except Exception as e:
                         print(f"[PluginRegistry] Error reading manifest {item.name}: {e}")

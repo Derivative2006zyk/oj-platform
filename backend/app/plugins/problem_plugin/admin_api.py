@@ -45,3 +45,19 @@ async def disable_plugin(
     if registry.get(plugin_name):
         await registry.disable(plugin_name)
     return {"name": plugin_name, "enabled": False}
+
+from pydantic import BaseModel
+from app.core.plugin_config_store import update_config # 确保引入了 update_config
+
+class PluginConfigUpdate(BaseModel):
+    config: dict
+
+@router.put("/{plugin_name}/config")
+async def update_plugin_config(
+    plugin_name: str,
+    data: PluginConfigUpdate,
+    _: str = Depends(verify_admin_key),
+):
+    """更新插件的附加配置"""
+    await update_config(plugin_name, data.config)
+    return {"name": plugin_name, "config": data.config}
