@@ -67,6 +67,17 @@
                 <div class="plugin-author">作者: {{ p.author }}</div>
               </div>
               <div class="plugin-actions">
+                <!-- 【新增】导航栏显示开关（只针对有 UI 的插件显示） -->
+                <label v-if="p.ui_manifest" class="nav-toggle-label">
+                  <input 
+                    type="checkbox" 
+                    :checked="p.show_in_nav !== false" 
+                    @change="onToggleNav(p)"
+                    :disabled="togglingNav"
+                  />
+                  显示在导航栏
+                </label>
+
                 <button 
                   class="btn-ghost" 
                   @click="onTogglePlugin(p)"
@@ -92,12 +103,9 @@
           <div v-else-if="marketPlugins.length === 0" class="empty-text">暂无可用插件。</div>
           <div v-else class="market-grid">
             <div v-for="p in marketPlugins" :key="p.name" class="market-card">
-              
-              <!-- 动态字母图标 -->
               <div class="market-icon" :style="{ backgroundColor: getIconColor(p.name) }">
                 {{ getIconLetter(p.display_name) }}
               </div>
-              
               <div class="market-info">
                 <div class="market-title">
                   {{ p.display_name }} <span class="version">v{{ p.version }}</span>
@@ -368,6 +376,35 @@ function triggerRestart() {
   }
 }
 
+// ===== 插件导航栏显示切换 =====
+const togglingNav = ref(false)
+
+async function onToggleNav(p: any) {
+  togglingNav.value = true
+  try {
+    const adminKey = localStorage.getItem('admin_key') || ''
+    const newShow = p.show_in_nav === false ? true : false
+    
+    // 保留原有的其他配置
+    const currentConfig = { ...(p.config || {}), show_in_nav: newShow }
+    
+    await api.put(`/admin/plugins/${p.name}/config`, 
+      { config: currentConfig },
+      { headers: { 'X-Admin-Key': adminKey } }
+    )
+    
+    // 更新本地状态，触发响应式
+    p.show_in_nav = newShow
+    // 刷新全局插件列表，让导航栏即时生效
+    pluginStore.fetchPlugins()
+    
+  } catch (e: any) {
+    alert('操作失败：' + (e.response?.data?.detail || e.message))
+  } finally {
+    togglingNav.value = false
+  }
+}
+
 // ===== 插件启停/卸载 =====
 const toggling = ref(false)
 async function onTogglePlugin(p: any) {
@@ -452,7 +489,22 @@ onMounted(async () => {
 .version { font-size: 12px; color: var(--color-text-secondary); font-weight: normal; margin-left: 6px; }
 .plugin-desc { font-size: 13px; color: var(--color-text-secondary); margin-bottom: 6px; }
 .plugin-author { font-size: 12px; color: var(--color-text-muted); }
-.plugin-actions { margin-left: auto; display: flex; gap: 8px; flex-shrink: 0; }
+.plugin-actions { margin-left: auto; display: flex; gap: 12px; align-items: center; flex-shrink: 0; }
+
+/* 【新增】导航栏显示开关样式 */
+.nav-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+.nav-toggle-label input {
+  cursor: pointer;
+}
+
 .uninstall-btn { color: var(--color-danger-text); border-color: var(--color-danger-text); }
 .uninstall-btn:hover:not(:disabled) { background: var(--color-danger-bg); color: var(--color-danger-text); }
 
@@ -475,8 +527,6 @@ onMounted(async () => {
   box-shadow: var(--shadow-card-hover);
   transform: translateY(-2px);
 }
-
-/* 纯色首字母图标 */
 .market-icon {
   width: 48px;
   height: 48px;
@@ -489,7 +539,6 @@ onMounted(async () => {
   font-weight: bold;
   margin-bottom: var(--spacing-md);
 }
-
 .market-info {
   flex: 1;
 }
@@ -528,4 +577,14 @@ onMounted(async () => {
 .spinner { width: 40px; height: 40px; border: 4px solid var(--color-border); border-top-color: var(--color-primary); border-radius: 50%; animation: spin 1s linear infinite; }
 .restart-text { margin-top: var(--spacing-md); color: var(--color-primary); font-weight: bold; font-size: var(--font-size-body); }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* =========================================
+   暗色模式专属修复
+   ========================================= */
+[data-theme="dark"] .restart-overlay {
+  background: rgba(0, 0, 0, 0.85);
+}
+[data-theme="dark"] .market-card {
+  background: var(--color-bg-card);
+}
 </style>

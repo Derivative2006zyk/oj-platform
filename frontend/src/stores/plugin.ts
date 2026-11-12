@@ -10,6 +10,7 @@ export interface PluginManifest {
   description: string
   folder_name: string
   enabled?: boolean
+  show_in_nav?: boolean
   ui_manifest?: {
     menu_name: string
     route_path: string

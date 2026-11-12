@@ -16,7 +16,7 @@
         <!-- 动态插件菜单 -->
         <template v-for="p in pluginStore.plugins" :key="p.name">
           <router-link
-            v-if="p.enabled !== false"
+            v-if="p.enabled !== false && p.show_in_nav !== false"
             :to="p.ui_manifest?.route_path || '/plugin/' + p.folder_name"
             class="nav-link"
           >
