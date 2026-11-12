@@ -721,11 +721,11 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-/* 样式保持不变 */
 .problem-list {
   max-width: 960px;
   margin: 0 auto;
   padding: var(--spacing-xl) var(--spacing-lg);
+  color: var(--color-text-primary);
 }
 
 .offline-alert {
@@ -877,7 +877,7 @@ onMounted(async () => {
   font-size: var(--font-size-body);
   outline: none;
   transition: border-color 0.2s;
-  background: var(--color-bg-card);
+  background: var(--color-bg-page);
   color: var(--color-text-primary);
 }
 
@@ -889,7 +889,7 @@ onMounted(async () => {
   padding: 8px 12px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  background: var(--color-bg-card);
+  background: var(--color-bg-page);
   color: var(--color-text-primary);
   font-size: var(--font-size-body);
   cursor: pointer;
@@ -925,23 +925,23 @@ onMounted(async () => {
 .btn-ghost {
   padding: 8px 20px;
   background: transparent;
-  color: var(--color-primary);
-  border: 1px solid var(--color-primary);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   font-size: var(--font-size-body);
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background 0.2s, border-color 0.2s;
 }
 
 .btn-ghost:hover:not(:disabled) {
   background: var(--color-primary-light);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 .btn-ghost:disabled {
   opacity: 0.4;
   cursor: not-allowed;
-  color: var(--color-text-muted);
-  border-color: var(--color-border);
 }
 
 .btn-ghost.active {
@@ -1216,7 +1216,7 @@ onMounted(async () => {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   font-size: var(--font-size-body);
-  background: var(--color-bg-card);
+  background: var(--color-bg-page);
   color: var(--color-text-primary);
   outline: none;
 }
@@ -1337,5 +1337,61 @@ onMounted(async () => {
 .delete-btn:hover {
   color: var(--color-danger-text);
   border-color: var(--color-danger-text);
+}
+
+/* =========================================
+   【终极覆盖】暗色模式专属修复
+   确保整个列表页面底色纯黑、字体纯白、标签高对比度
+   ========================================= */
+[data-theme="dark"] .problem-list {
+  color: var(--color-text-primary);
+}
+
+[data-theme="dark"] .problem-title,
+[data-theme="dark"] .page-header h1,
+[data-theme="dark"] .group-title {
+  color: #f8fafc !important; /* 强制亮白 */
+}
+
+[data-theme="dark"] .page-desc,
+[data-theme="dark"] .difficulty {
+  color: #94a3b8 !important;
+}
+
+/* 标签：深蓝背景 + 亮蓝文字 */
+[data-theme="dark"] .tag-pill {
+  background: rgba(59, 130, 246, 0.2) !important;
+  color: #93c5fd !important;
+}
+
+/* 题型徽章：深灰背景 + 亮灰文字 */
+[data-theme="dark"] .type-badge {
+  background: #334155 !important;
+  color: #cbd5e1 !important;
+}
+
+/* 按钮：边框和文字亮色 */
+[data-theme="dark"] .btn-ghost {
+  color: #e2e8f0 !important;
+  border-color: #334155 !important;
+}
+[data-theme="dark"] .btn-ghost:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.1) !important;
+  color: #60a5fa !important;
+  border-color: #3b82f6 !important;
+}
+
+/* 输入框：强制深色底，浅色字 */
+[data-theme="dark"] .search-input,
+[data-theme="dark"] .filter-select {
+  background: #000000 !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+}
+
+/* 下拉菜单的选项（原生限制，尽量适配） */
+[data-theme="dark"] .filter-select option {
+  background: #151515 !important;
+  color: #f8fafc !important;
 }
 </style>

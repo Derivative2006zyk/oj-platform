@@ -43,3 +43,10 @@ backend/plugins_installed/*
 docker-compose-linux
 docker-compose.exe
 build/
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
