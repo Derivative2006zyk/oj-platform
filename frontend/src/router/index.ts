@@ -72,6 +72,11 @@ const routes: RouteRecordRaw[] = [
     name: 'plugin-view',
     component: () => import('../views/PluginView.vue'),
   },
+  {
+    path: '/ai-test',
+    name: 'AITest',
+    component: () => import('../views/AITest.vue')
+  }
 ]
 
 const router = createRouter({
