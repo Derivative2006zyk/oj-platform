@@ -7,6 +7,7 @@ from app.models.plugin_config import PluginConfig
 from app.models.user import User
 from app.models.submission import Submission
 from app.models.bank import Bank
+from .user_ai_config import UserAIConfig
 
 __all__ = [
     "Category",

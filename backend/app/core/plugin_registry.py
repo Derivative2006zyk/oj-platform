@@ -44,37 +44,28 @@ class PluginRegistry:
         path = Path(plugin_dir)
         if not path.exists():
             return
-
         for item in path.iterdir():
-            if not item.is_dir():
-                continue
+            if not item.is_dir(): continue
             manifest_file = item / "manifest.json"
             entry_file = item / "backend" / "__init__.py"
-            if not (manifest_file.exists() and entry_file.exists()):
-                continue
+            if not (manifest_file.exists() and entry_file.exists()): continue
 
             plugin_name = item.name
             mod_name = f"ext_plugin_{plugin_name}"
-
-            if mod_name in sys.modules:
-                continue
+            if mod_name in sys.modules: continue
 
             print(f"[PluginRegistry] Found external plugin: {plugin_name}")
             try:
                 before_classes = set(_plugin_classes)
-                
                 spec = importlib.util.spec_from_file_location(mod_name, entry_file)
                 module = importlib.util.module_from_spec(spec)
                 sys.modules[mod_name] = module
                 spec.loader.exec_module(module)
-                
-                # 暴力纠正：无论插件代码里写的 name 是什么，一律强制改为目录名！
                 for cls in _plugin_classes:
                     if cls not in before_classes:
                         if cls.name != plugin_name:
                             print(f"[PluginRegistry] Correcting plugin name: {cls.name} -> {plugin_name}")
                             cls.name = plugin_name
-                            
             except Exception as e:
                 print(f"[PluginRegistry] Failed to load external plugin {plugin_name}: {e}")
 
@@ -94,15 +85,12 @@ class PluginRegistry:
     async def load_all(self) -> None:
         from app.core.plugin_config_store import get_all_configs
         configs = await get_all_configs()
-
         for name, plugin in self._plugins.items():
             enabled = configs[name].enabled if name in configs else True
             plugin._enabled = enabled
-
             if not enabled:
                 print(f"[PluginRegistry] skip disabled plugin: {name}")
                 continue
-
             try:
                 await plugin.on_load()
                 print(f"[PluginRegistry] loaded: {name} v{plugin.version}")
@@ -111,10 +99,8 @@ class PluginRegistry:
 
     async def unload_all(self) -> None:
         for name, plugin in self._plugins.items():
-            try:
-                await plugin.on_unload()
-            except Exception:
-                pass
+            try: await plugin.on_unload()
+            except Exception: pass
 
     async def enable(self, name: str) -> None:
         if name in self._plugins:
@@ -130,16 +116,12 @@ class PluginRegistry:
         return self._plugins.get(name)
 
     def list_plugins(self) -> List[Dict[str, str]]:
-        return [
-            {"name": p.name, "version": p.version, "dependencies": ",".join(p.dependencies)}
-            for p in self._plugins.values()
-        ]
+        return [{"name": p.name, "version": p.version, "dependencies": ",".join(p.dependencies)} for p in self._plugins.values()]
 
     def collect_routers(self) -> List[APIRouter]:
         routers = []
         for name, plugin in self._plugins.items():
-            if getattr(plugin, "_enabled", True) is False:
-                continue
+            if getattr(plugin, "_enabled", True) is False: continue
             routers.extend(plugin.get_routers())
         return routers
 
@@ -149,8 +131,7 @@ class PluginRegistry:
 
         results = []
         path = PLUGINS_INSTALLED_DIR
-        if not path.exists():
-            return results
+        if not path.exists(): return results
 
         for item in path.iterdir():
             if item.is_dir():
@@ -162,13 +143,13 @@ class PluginRegistry:
                             data["folder_name"] = item.name
                             data["name"] = item.name
                             
-                            # 获取数据库配置
                             db_cfg = configs.get(item.name)
                             data["enabled"] = db_cfg.enabled if db_cfg else True
                             
-                            # 【新增】提取 show_in_nav 配置（默认 True）
+                            # 【核心修复】完整返回 config 字典
                             plugin_config = db_cfg.config if db_cfg and db_cfg.config else {}
                             data["show_in_nav"] = plugin_config.get("show_in_nav", True)
+                            data["config"] = plugin_config
                             
                             results.append(data)
                     except Exception as e:
@@ -208,7 +189,6 @@ class PluginRegistry:
                 await proc.communicate()
             except Exception as e:
                 print(f"[PluginRegistry] compose down failed: {e}")
-
 
 def get_plugin_registry() -> PluginRegistry:
     global _registry_instance
