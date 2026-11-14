@@ -10,13 +10,8 @@
       <section class="card">
         <div class="card-header"><span>后端连接地址</span></div>
         <div class="card-body">
-          <p class="hint">
-            当前连接地址：<code>{{ currentUrl || '相对路径 (默认)' }}</code>
-          </p>
-          <div v-if="lanIp && isTauri" class="lan-tip">
-            本机局域网地址：<strong>{{ lanIp }}</strong><br>
-            (移动端请填入此地址)
-          </div>
+          <p class="hint">当前连接地址：<code>{{ currentUrl || '相对路径 (默认)' }}</code></p>
+          <div v-if="lanIp && isTauri" class="lan-tip">本机局域网地址：<strong>{{ lanIp }}</strong><br>(移动端请填入此地址)</div>
           <div class="form-item">
             <label>修改后端地址</label>
             <input v-model="inputUrl" type="text" placeholder="例如: http://192.168.1.100:8000" />
@@ -24,14 +19,10 @@
           </div>
           <div class="actions">
             <button class="btn-primary" @click="saveConfig">保存</button>
-            <button class="btn-ghost" @click="testConnection" :disabled="testing">
-              {{ testing ? '测试中...' : '测试连接' }}
-            </button>
+            <button class="btn-ghost" @click="testConnection" :disabled="testing">{{ testing ? '测试中...' : '测试连接' }}</button>
             <button class="btn-ghost" @click="resetConfig">重置默认</button>
           </div>
-          <div v-if="testResult" :class="['test-result', testSuccess ? 'success' : 'error']">
-            {{ testResult }}
-          </div>
+          <div v-if="testResult" :class="['test-result', testSuccess ? 'success' : 'error']">{{ testResult }}</div>
         </div>
       </section>
 
@@ -41,12 +32,8 @@
         <div class="card-body">
           <p class="hint">导出包含所有题库、账号和上传图片的完整 ZIP 包。恢复操作会覆盖当前所有数据，请谨慎操作。</p>
           <div class="actions">
-            <button class="btn-primary" @click="onBackup" :disabled="backingUp">
-              {{ backingUp ? '备份中...' : '导出备份' }}
-            </button>
-            <button class="btn-ghost" style="color: var(--color-danger-text); border-color: var(--color-danger-text);" @click="onRestoreClick" :disabled="restoring">
-              {{ restoring ? '恢复中...' : '从备份恢复' }}
-            </button>
+            <button class="btn-primary" @click="onBackup" :disabled="backingUp">{{ backingUp ? '备份中...' : '导出备份' }}</button>
+            <button class="btn-ghost" style="color: var(--color-danger-text); border-color: var(--color-danger-text);" @click="onRestoreClick" :disabled="restoring">{{ restoring ? '恢复中...' : '从备份恢复' }}</button>
             <input ref="fileInputRef" type="file" accept=".zip" style="display: none;" @change="onRestoreFileChange" />
           </div>
         </div>
@@ -60,35 +47,16 @@
           <div v-else class="plugin-list">
             <div v-for="p in pluginStore.plugins" :key="p.name" class="plugin-item" :class="{ 'is-disabled': p.enabled === false }">
               <div class="plugin-info">
-                <div class="plugin-title">
-                  {{ p.display_name }} <span class="version">v{{ p.version }}</span>
-                </div>
+                <div class="plugin-title">{{ p.display_name }} <span class="version">v{{ p.version }}</span></div>
                 <div class="plugin-desc">{{ p.description }}</div>
                 <div class="plugin-author">作者: {{ p.author }}</div>
               </div>
               <div class="plugin-actions">
-                <!-- 【新增】导航栏显示开关（只针对有 UI 的插件显示） -->
                 <label v-if="p.ui_manifest" class="nav-toggle-label">
-                  <input 
-                    type="checkbox" 
-                    :checked="p.show_in_nav !== false" 
-                    @change="onToggleNav(p)"
-                    :disabled="togglingNav"
-                  />
-                  显示在导航栏
+                  <input type="checkbox" :checked="p.show_in_nav !== false" @change="onToggleNav(p)" :disabled="togglingNav" /> 显示在导航栏
                 </label>
-
-                <button 
-                  class="btn-ghost" 
-                  @click="onTogglePlugin(p)"
-                  :disabled="toggling"
-                  :style="{ color: p.enabled ? 'var(--color-warning)' : 'var(--color-success)' }"
-                >
-                  {{ toggling ? '处理中...' : (p.enabled ? '禁用' : '启用') }}
-                </button>
-                <button class="btn-ghost uninstall-btn" @click="onUninstallPlugin(p)" :disabled="uninstalling">
-                  {{ uninstalling ? '卸载中...' : '卸载' }}
-                </button>
+                <button class="btn-ghost" @click="onTogglePlugin(p)" :disabled="toggling" :style="{ color: p.enabled ? 'var(--color-warning)' : 'var(--color-success)' }">{{ toggling ? '处理中...' : (p.enabled ? '禁用' : '启用') }}</button>
+                <button class="btn-ghost uninstall-btn" @click="onUninstallPlugin(p)" :disabled="uninstalling">{{ uninstalling ? '卸载中...' : '卸载' }}</button>
               </div>
             </div>
           </div>
@@ -103,28 +71,44 @@
           <div v-else-if="marketPlugins.length === 0" class="empty-text">暂无可用插件。</div>
           <div v-else class="market-grid">
             <div v-for="p in marketPlugins" :key="p.name" class="market-card">
-              <div class="market-icon" :style="{ backgroundColor: getIconColor(p.name) }">
-                {{ getIconLetter(p.display_name) }}
-              </div>
+              <div class="market-icon" :style="{ backgroundColor: getIconColor(p.name) }">{{ getIconLetter(p.display_name) }}</div>
               <div class="market-info">
-                <div class="market-title">
-                  {{ p.display_name }} <span class="version">v{{ p.version }}</span>
-                </div>
+                <div class="market-title">{{ p.display_name }} <span class="version">v{{ p.version }}</span></div>
                 <div class="market-desc">{{ p.description }}</div>
-                <div class="market-meta">
-                  <span class="category">{{ p.category }}</span>
-                  <span class="author">{{ p.author }}</span>
-                </div>
+                <div class="market-meta"><span class="category">{{ p.category }}</span><span class="author">{{ p.author }}</span></div>
               </div>
               <div class="market-footer">
                 <button v-if="isInstalled(p.name)" class="btn-ghost" disabled>已安装</button>
                 <button v-else-if="!p.download_url" class="btn-ghost" disabled>敬请期待</button>
-                <button v-else class="btn-primary" @click="onInstallPlugin(p)" :disabled="installing">
-                  {{ installing ? '安装中...' : '一键安装' }}
-                </button>
+                <button v-else class="btn-primary" @click="onInstallPlugin(p)" :disabled="installing">{{ installing ? '安装中...' : '一键安装' }}</button>
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      <!-- ===== AI 模型配置 ===== -->
+      <section class="card" style="margin-top: var(--spacing-lg);">
+        <div class="card-header"><span>AI 模型配置 (Profile 管理)</span></div>
+        <div class="card-body">
+          <div style="display: flex; gap: 12px; margin-bottom: var(--spacing-lg); align-items: center;">
+            <select v-model="currentProfile" class="filter-select" style="flex: 1; min-width: 150px;" @change="onProfileChange">
+              <option value="" disabled>-- 请选择配置 --</option>
+              <option v-for="name in Object.keys(aiProfiles)" :key="name" :value="name">{{ name }}</option>
+            </select>
+            <button class="btn-ghost" @click="createNewProfile" style="white-space: nowrap;">+ 新建配置</button>
+            <button class="btn-ghost" style="color: var(--color-danger-text); border-color: var(--color-danger-text);" @click="deleteCurrentProfile" :disabled="!currentProfile">删除</button>
+          </div>
+
+          <div v-if="currentProfile">
+            <p class="hint">当前正在编辑: <strong>{{ currentProfile }}</strong></p>
+            <div class="form-item"><label>API Key</label><input v-model="aiConfig.api_key" type="password" placeholder="sk-..." /></div>
+            <div class="form-item"><label>API Base URL</label><input v-model="aiConfig.base_url" type="text" placeholder="例如 https://api.deepseek.com" /></div>
+            <div class="form-item"><label>模型名称 (Model)</label><input v-model="aiConfig.model" type="text" placeholder="例如 deepseek-chat" /></div>
+            <div class="form-item"><label>系统提示词 (System Prompt)</label><textarea v-model="aiConfig.system_prompt" rows="3" placeholder="定义 AI 的身份..."></textarea></div>
+            <div class="actions"><button class="btn-primary" @click="onSaveAIConfig">保存所有配置</button></div>
+          </div>
+          <div v-else class="empty-text">暂未配置 AI 模型，请点击“新建配置”。</div>
         </div>
       </section>
     </div>
@@ -143,27 +127,22 @@ import { invoke } from '@tauri-apps/api/core'
 import { getBackendUrl, setBackendUrl, isTauriEnv } from '../utils/backend-url'
 import { usePluginStore } from '../stores/plugin'
 import api from '../utils/axios'
+// 【修复】引入 AI 相关的 API 方法
+import { getAIConfig, saveAIConfig } from '../api/ai'
 
 const pluginStore = usePluginStore()
 const isTauri = isTauriEnv()
 
 // ===== 插件市场图标辅助 =====
-function getIconLetter(displayName: string) {
-  return displayName ? displayName.charAt(0).toUpperCase() : 'P'
-}
+function getIconLetter(displayName: string) { return displayName ? displayName.charAt(0).toUpperCase() : 'P' }
 function getIconColor(name: string) {
   const colors = ['#0066cc', '#34a853', '#ea4335', '#fbbc05', '#8e44ad']
-  let hash = 0
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash)
-  }
+  let hash = 0; for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
   return colors[Math.abs(hash) % colors.length]
 }
 
 // ===== 判断插件是否已安装 =====
-function isInstalled(pluginName: string) {
-  return pluginStore.plugins.some(p => p.name === pluginName)
-}
+function isInstalled(pluginName: string) { return pluginStore.plugins.some(p => p.name === pluginName) }
 
 // ===== 数据备份与恢复 =====
 const backingUp = ref(false)
@@ -174,51 +153,26 @@ async function onBackup() {
   backingUp.value = true
   try {
     const adminKey = localStorage.getItem('admin_key') || ''
-    const res = await api.get('/admin/backup/export', {
-      headers: { 'X-Admin-Key': adminKey },
-      responseType: 'blob'
-    })
+    const res = await api.get('/admin/backup/export', { headers: { 'X-Admin-Key': adminKey }, responseType: 'blob' })
     const url = URL.createObjectURL(res.data)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `oj_backup_${Date.now()}.zip`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-  } catch (e: any) {
-    alert('导出失败：' + (e.response?.data?.detail || e.message))
-  } finally {
-    backingUp.value = false
-  }
+    const a = document.createElement('a'); a.href = url; a.download = `oj_backup_${Date.now()}.zip`
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url)
+  } catch (e: any) { alert('导出失败：' + (e.response?.data?.detail || e.message)) } finally { backingUp.value = false }
 }
 
-function onRestoreClick() {
-  if (confirm('警告：恢复数据会覆盖当前所有的题库、账号和提交记录！\n\n确定要继续吗？')) {
-    fileInputRef.value?.click()
-  }
-}
+function onRestoreClick() { if (confirm('警告：恢复数据会覆盖当前所有的题库、账号和提交记录！\n\n确定要继续吗？')) fileInputRef.value?.click() }
 
 async function onRestoreFileChange(e: Event) {
   const input = e.target as HTMLInputElement
   if (!input.files || input.files.length === 0) return
   const file = input.files[0]
   restoring.value = true
-  const formData = new FormData()
-  formData.append('file', file)
+  const formData = new FormData(); formData.append('file', file)
   try {
     const adminKey = localStorage.getItem('admin_key') || ''
-    await api.post('/admin/backup/import', formData, {
-      headers: { 'X-Admin-Key': adminKey, 'Content-Type': 'multipart/form-data' }
-    })
-    alert('恢复成功！建议重启软件以确保数据完全同步。')
-    window.location.reload()
-  } catch (e: any) {
-    alert('恢复失败：' + (e.response?.data?.detail || e.message))
-  } finally {
-    restoring.value = false
-    input.value = ''
-  }
+    await api.post('/admin/backup/import', formData, { headers: { 'X-Admin-Key': adminKey, 'Content-Type': 'multipart/form-data' } })
+    alert('恢复成功！建议重启软件以确保数据完全同步。'); window.location.reload()
+  } catch (e: any) { alert('恢复失败：' + (e.response?.data?.detail || e.message)) } finally { restoring.value = false; input.value = '' }
 }
 
 // ===== 网络配置 =====
@@ -229,26 +183,12 @@ const testing = ref(false)
 const testResult = ref('')
 const testSuccess = ref(false)
 
-function loadConfig() {
-  currentUrl.value = getBackendUrl()
-  inputUrl.value = currentUrl.value
-}
-
-function saveConfig() {
-  setBackendUrl(inputUrl.value)
-  currentUrl.value = getBackendUrl()
-  alert('保存成功！')
-  window.location.href = '/'
-}
-
-function resetConfig() {
-  setBackendUrl('')
-  loadConfig()
-}
+function loadConfig() { currentUrl.value = getBackendUrl(); inputUrl.value = currentUrl.value }
+function saveConfig() { setBackendUrl(inputUrl.value); currentUrl.value = getBackendUrl(); alert('保存成功！'); window.location.href = '/' }
+function resetConfig() { setBackendUrl(''); loadConfig() }
 
 async function testConnection() {
-  testing.value = true
-  testResult.value = ''
+  testing.value = true; testResult.value = ''
   const base = inputUrl.value.trim().replace(/\/$/, '') || (isTauri ? 'http://127.0.0.1:8000' : '')
   const targetUrl = base ? `${base}/health` : '/health'
   try {
@@ -257,23 +197,10 @@ async function testConnection() {
     const duration = Date.now() - start
     if (res.ok) {
       const data = await res.json()
-      if (data.status === 'ok') {
-        testSuccess.value = true
-        testResult.value = `连接成功！耗时 ${duration}ms。Redis 状态：${data.redis}`
-      } else {
-        testSuccess.value = false
-        testResult.value = '响应格式异常'
-      }
-    } else {
-      testSuccess.value = false
-      testResult.value = `HTTP 错误：${res.status}`
-    }
-  } catch (e: any) {
-    testSuccess.value = false
-    testResult.value = `连接失败：${e.message || e}`
-  } finally {
-    testing.value = false
-  }
+      if (data.status === 'ok') { testSuccess.value = true; testResult.value = `连接成功！耗时 ${duration}ms。Redis 状态：${data.redis}` }
+      else { testSuccess.value = false; testResult.value = '响应格式异常' }
+    } else { testSuccess.value = false; testResult.value = `HTTP 错误：${res.status}` }
+  } catch (e: any) { testSuccess.value = false; testResult.value = `连接失败：${e.message || e}` } finally { testing.value = false }
 }
 
 // ===== 插件市场 =====
@@ -282,17 +209,10 @@ const marketPlugins = ref<any[]>([])
 
 async function fetchMarket() {
   marketLoading.value = true
-  try {
-    const res = await api.get('/market/plugins')
-    marketPlugins.value = res.data
-  } catch (e) {
-    console.error('获取市场列表失败', e)
-  } finally {
-    marketLoading.value = false
-  }
+  try { const res = await api.get('/market/plugins'); marketPlugins.value = res.data } catch (e) { console.error(e) } finally { marketLoading.value = false }
 }
 
-// ===== 插件安装（异步轮询版） =====
+// ===== 插件安装 =====
 const installing = ref(false)
 const installingPluginName = ref('')
 const installStatus = ref('')
@@ -305,8 +225,8 @@ const overlayText = computed(() => {
     case 'starting': return '正在建立连接...'
     case 'downloading': return '正在下载插件包...'
     case 'extracting': return '正在解压文件...'
-    case 'installing_deps': return '正在安装依赖库 (可能耗时较久)...'
-    case 'starting_service': return '正在启动微服务，请稍候...'
+    case 'installing_deps': return '正在安装依赖库...'
+    case 'starting_service': return '正在启动微服务...'
     default: return '处理中...'
   }
 })
@@ -314,99 +234,42 @@ const overlayText = computed(() => {
 async function onInstallPlugin(plugin: any) {
   if (!plugin.download_url) return
   if (!confirm(`确定要安装 ${plugin.display_name} 吗？`)) return
-
-  installing.value = true
-  installingPluginName.value = plugin.name
-  installStatus.value = 'starting'
-
+  installing.value = true; installingPluginName.value = plugin.name; installStatus.value = 'starting'
   try {
     const adminKey = localStorage.getItem('admin_key') || ''
-    
-    await api.post('/admin/market/install', 
-      { download_url: plugin.download_url }, 
-      { headers: { 'X-Admin-Key': adminKey } }
-    )
-
+    await api.post('/admin/market/install', { download_url: plugin.download_url }, { headers: { 'X-Admin-Key': adminKey } })
     let retries = 300
     pollTimer = window.setInterval(async () => {
       try {
-        const res = await api.get(`/admin/market/install_status/${plugin.name}`, {
-          headers: { 'X-Admin-Key': adminKey }
-        })
-        const status = res.data.status
-        installStatus.value = status
-
-        if (status === 'success') {
-          if (pollTimer) clearInterval(pollTimer)
-          installing.value = false
-          triggerRestart()
-        } else if (status === 'error') {
-          if (pollTimer) clearInterval(pollTimer)
-          installing.value = false
-          alert('安装失败：' + res.data.detail)
-        }
-      } catch (e) {
-        console.error('轮询状态失败', e)
-      }
-
-      retries--
-      if (retries <= 0) {
-        if (pollTimer) clearInterval(pollTimer)
-        installing.value = false
-        alert('安装超时，请检查后端日志。')
-      }
+        const res = await api.get(`/admin/market/install_status/${plugin.name}`, { headers: { 'X-Admin-Key': adminKey } })
+        const status = res.data.status; installStatus.value = status
+        if (status === 'success') { if (pollTimer) clearInterval(pollTimer); installing.value = false; triggerRestart() }
+        else if (status === 'error') { if (pollTimer) clearInterval(pollTimer); installing.value = false; alert('安装失败：' + res.data.detail) }
+      } catch (e) { console.error(e) }
+      retries--; if (retries <= 0) { if (pollTimer) clearInterval(pollTimer); installing.value = false; alert('安装超时') }
     }, 1000)
-
-  } catch (e: any) {
-    installing.value = false
-    alert('启动安装失败：' + (e.response?.data?.detail || e.message || e))
-  }
+  } catch (e: any) { installing.value = false; alert('启动安装失败：' + (e.response?.data?.detail || e.message)) }
 }
 
 function triggerRestart() {
-  if (isTauri) {
-    restarting.value = true
-    invoke('restart_backend_cmd').finally(() => {
-      restarting.value = false
-      window.location.reload()
-    })
-  } else {
-    alert('插件安装成功！请手动重启后端服务后刷新页面。')
-    window.location.reload()
-  }
+  if (isTauri) { restarting.value = true; invoke('restart_backend_cmd').finally(() => { restarting.value = false; window.location.reload() }) }
+  else { alert('插件安装成功！请手动重启后端服务后刷新页面。'); window.location.reload() }
 }
 
-// ===== 插件导航栏显示切换 =====
-const togglingNav = ref(false)
+// ===== 插件启停/卸载 =====
+const togglingNav = ref(false); const toggling = ref(false); const uninstalling = ref(false)
 
 async function onToggleNav(p: any) {
   togglingNav.value = true
   try {
     const adminKey = localStorage.getItem('admin_key') || ''
     const newShow = p.show_in_nav === false ? true : false
-    
-    // 保留原有的其他配置
     const currentConfig = { ...(p.config || {}), show_in_nav: newShow }
-    
-    await api.put(`/admin/plugins/${p.name}/config`, 
-      { config: currentConfig },
-      { headers: { 'X-Admin-Key': adminKey } }
-    )
-    
-    // 更新本地状态，触发响应式
-    p.show_in_nav = newShow
-    // 刷新全局插件列表，让导航栏即时生效
-    pluginStore.fetchPlugins()
-    
-  } catch (e: any) {
-    alert('操作失败：' + (e.response?.data?.detail || e.message))
-  } finally {
-    togglingNav.value = false
-  }
+    await api.put(`/admin/plugins/${p.name}/config`, { config: currentConfig }, { headers: { 'X-Admin-Key': adminKey } })
+    p.show_in_nav = newShow; pluginStore.fetchPlugins()
+  } catch (e: any) { alert('操作失败：' + (e.response?.data?.detail || e.message)) } finally { togglingNav.value = false }
 }
 
-// ===== 插件启停/卸载 =====
-const toggling = ref(false)
 async function onTogglePlugin(p: any) {
   if (!confirm(`确定要${p.enabled ? '禁用' : '启用'} ${p.display_name} 吗？`)) return
   toggling.value = true
@@ -414,39 +277,93 @@ async function onTogglePlugin(p: any) {
     const adminKey = localStorage.getItem('admin_key') || ''
     const action = p.enabled ? 'disable' : 'enable'
     await api.put(`/admin/plugins/${p.name}/${action}`, {}, { headers: { 'X-Admin-Key': adminKey } })
-    alert(`已${p.enabled ? '禁用' : '启用'}。需重启后端生效。`)
-    triggerRestart()
-  } catch (e: any) {
-    alert('操作失败：' + (e.response?.data?.detail || e.message || e))
-  } finally {
-    toggling.value = false
-  }
+    alert(`已${p.enabled ? '禁用' : '启用'}。需重启后端生效。`); triggerRestart()
+  } catch (e: any) { alert('操作失败：' + (e.response?.data?.detail || e.message)) } finally { toggling.value = false }
 }
 
-const uninstalling = ref(false)
 async function onUninstallPlugin(p: any) {
   const folderName = p.folder_name || p.name
-  if (!confirm(`确定要卸载 ${p.display_name || p.name} 吗？\n\n这会销毁插件的微服务容器（Docker 镜像保留）。`)) return
+  if (!confirm(`确定要卸载 ${p.display_name || p.name} 吗？\n\n这会销毁插件的微服务容器。`)) return
   uninstalling.value = true
   try {
     const adminKey = localStorage.getItem('admin_key') || ''
     await api.delete(`/admin/market/uninstall/${folderName}`, { headers: { 'X-Admin-Key': adminKey } })
-    alert('插件已卸载，页面将刷新。')
-    window.location.reload()
-  } catch (e: any) {
-    alert('卸载失败：' + (e.response?.data?.detail || e.message || e))
-  } finally {
-    uninstalling.value = false
+    alert('插件已卸载，页面将刷新。'); window.location.reload()
+  } catch (e: any) { alert('卸载失败：' + (e.response?.data?.detail || e.message)) } finally { uninstalling.value = false }
+}
+
+// ===== AI 模型配置 =====
+const aiProfiles = ref<Record<string, any>>({})
+const currentProfile = ref<string>('')
+const aiConfig = ref({ api_key: '', base_url: '', model: '', system_prompt: '' })
+const aiLoading = ref(true)
+
+function onProfileChange() {
+  if (currentProfile.value && aiProfiles.value[currentProfile.value]) {
+    aiConfig.value = JSON.parse(JSON.stringify(aiProfiles.value[currentProfile.value]))
   }
 }
 
+function createNewProfile() {
+  const name = prompt('请输入新配置的名称 (例如: DeepSeek, 智谱GLM):')
+  if (!name || !name.trim()) return
+  const n = name.trim()
+  if (aiProfiles.value[n]) { alert('该配置名称已存在！'); return }
+  
+  aiProfiles.value[n] = { api_key: '', base_url: 'https://api.deepseek.com', model: 'deepseek-chat', system_prompt: '你是一个专业的编程与数学助教。' }
+  currentProfile.value = n
+  onProfileChange()
+}
+
+function deleteCurrentProfile() {
+  if (!currentProfile.value) return
+  if (confirm(`确定要删除配置 "${currentProfile.value}" 吗？`)) {
+    delete aiProfiles.value[currentProfile.value]
+    currentProfile.value = Object.keys(aiProfiles.value)[0] || ''
+    onProfileChange()
+  }
+}
+
+async function onSaveAIConfig() {
+  if (!currentProfile.value) return
+  aiProfiles.value[currentProfile.value] = { ...aiConfig.value }
+  try {
+    await saveAIConfig({
+      profiles: aiProfiles.value,
+      current_profile: currentProfile.value
+    })
+    alert('AI 配置已保存至云端账号！换设备登录也不会丢失。')
+  } catch (e: any) {
+    alert('保存失败：' + (e.response?.data?.detail || e.message))
+  }
+}
+
+// 初始化加载
 onMounted(async () => {
   loadConfig()
-  pluginStore.fetchPlugins()
-  fetchMarket()
-  if (isTauri) {
-    try { lanIp.value = await invoke<string>('get_lan_ip') } catch (e) { console.warn(e) }
+  await pluginStore.fetchPlugins()
+  
+  try {
+    const savedConfig = await getAIConfig()
+    if (savedConfig && savedConfig.profiles) {
+      aiProfiles.value = savedConfig.profiles
+      currentProfile.value = savedConfig.current_profile || Object.keys(aiProfiles.value)[0] || ''
+    } else {
+      // 如果没有配置，给个默认的
+      aiProfiles.value = {
+        'DeepSeek 默认': { api_key: '', base_url: 'https://api.deepseek.com', model: 'deepseek-chat', system_prompt: '你是一个专业的编程与数学助教。' }
+      }
+      currentProfile.value = 'DeepSeek 默认'
+    }
+    onProfileChange()
+  } catch (e) {
+    console.warn('获取 AI 配置失败', e)
+  } finally {
+    aiLoading.value = false
   }
+
+  fetchMarket()
+  if (isTauri) { try { lanIp.value = await invoke<string>('get_lan_ip') } catch (e) { console.warn(e) } }
 })
 </script>
 
@@ -464,9 +381,8 @@ onMounted(async () => {
 .lan-tip { background: var(--color-primary-light); color: var(--color-primary); padding: 12px; border-radius: var(--radius-md); font-size: 13px; margin-bottom: var(--spacing-lg); line-height: 1.6; }
 .form-item { display: flex; flex-direction: column; gap: 6px; margin-bottom: var(--spacing-lg); }
 .form-item label { font-size: 13px; color: var(--color-text-secondary); }
-.form-item input { padding: 10px 12px; border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: var(--font-size-body); background: var(--color-bg-card); color: var(--color-text-primary); outline: none; }
-.form-item input:focus { border-color: var(--color-primary); }
-.help { font-size: 12px; color: var(--color-text-muted); }
+.form-item input, .form-item textarea { padding: 10px 12px; border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: var(--font-size-body); background: var(--color-bg-card); color: var(--color-text-primary); outline: none; width: 100%; box-sizing: border-box; }
+.filter-select { padding: 10px 12px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-card); color: var(--color-text-primary); font-size: 14px; outline: none; }
 .actions { display: flex; gap: var(--spacing-sm); }
 .btn-primary, .btn-ghost { padding: 10px 20px; border-radius: var(--radius-md); font-size: var(--font-size-body); font-weight: 500; cursor: pointer; }
 .btn-primary { background: var(--color-primary); color: white; border: none; }
@@ -474,13 +390,10 @@ onMounted(async () => {
 .btn-primary:disabled { background: var(--color-primary-disabled); cursor: not-allowed; }
 .btn-ghost { background: transparent; color: var(--color-text-primary); border: 1px solid var(--color-border); }
 .btn-ghost:hover:not(:disabled) { border-color: var(--color-primary); color: var(--color-primary); }
-.btn-ghost:disabled { opacity: 0.5; cursor: not-allowed; }
 .test-result { margin-top: var(--spacing-md); padding: 10px 14px; border-radius: var(--radius-md); font-size: 13px; }
 .test-result.success { background: var(--color-success-bg); color: var(--color-success-text); }
 .test-result.error { background: var(--color-danger-bg); color: var(--color-danger-text); }
 .empty-text { text-align: center; color: var(--color-text-muted); padding: 20px; font-size: var(--font-size-body); }
-
-/* 已安装列表 */
 .plugin-list { display: flex; flex-direction: column; gap: 12px; }
 .plugin-item { padding: 12px 16px; background: var(--color-sample-bg); border-radius: var(--radius-md); border: 1px solid var(--color-border-light); display: flex; align-items: center; gap: var(--spacing-md); transition: opacity 0.2s; }
 .plugin-item.is-disabled { opacity: 0.6; }
@@ -490,101 +403,24 @@ onMounted(async () => {
 .plugin-desc { font-size: 13px; color: var(--color-text-secondary); margin-bottom: 6px; }
 .plugin-author { font-size: 12px; color: var(--color-text-muted); }
 .plugin-actions { margin-left: auto; display: flex; gap: 12px; align-items: center; flex-shrink: 0; }
-
-/* 【新增】导航栏显示开关样式 */
-.nav-toggle-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  user-select: none;
-}
-.nav-toggle-label input {
-  cursor: pointer;
-}
-
+.nav-toggle-label { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--color-text-secondary); cursor: pointer; user-select: none; }
+.nav-toggle-label input { cursor: pointer; }
 .uninstall-btn { color: var(--color-danger-text); border-color: var(--color-danger-text); }
 .uninstall-btn:hover:not(:disabled) { background: var(--color-danger-bg); color: var(--color-danger-text); }
-
-/* ===== 插件市场网格布局 ===== */
-.market-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: var(--spacing-md);
-}
-.market-card {
-  background: var(--color-bg-page);
-  border: 1px solid var(--color-border-light);
-  border-radius: var(--radius-lg);
-  padding: var(--spacing-lg);
-  display: flex;
-  flex-direction: column;
-  transition: box-shadow 0.2s, transform 0.2s;
-}
-.market-card:hover {
-  box-shadow: var(--shadow-card-hover);
-  transform: translateY(-2px);
-}
-.market-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: var(--radius-md);
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20px;
-  font-weight: bold;
-  margin-bottom: var(--spacing-md);
-}
-.market-info {
-  flex: 1;
-}
-.market-title {
-  font-size: 16px;
-  font-weight: bold;
-  color: var(--color-text-primary);
-  margin-bottom: 8px;
-}
-.market-desc {
-  font-size: 13px;
-  color: var(--color-text-secondary);
-  line-height: 1.5;
-  margin-bottom: 12px;
-}
-.market-meta {
-  display: flex;
-  gap: 12px;
-  font-size: 12px;
-  color: var(--color-text-muted);
-}
-.market-meta .category {
-  background: var(--color-primary-light);
-  color: var(--color-primary);
-  padding: 2px 8px;
-  border-radius: var(--radius-sm);
-}
-.market-footer {
-  margin-top: var(--spacing-md);
-  display: flex;
-  justify-content: flex-end;
-}
-
-/* 遮罩 */
+.market-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--spacing-md); }
+.market-card { background: var(--color-bg-page); border: 1px solid var(--color-border-light); border-radius: var(--radius-lg); padding: var(--spacing-lg); display: flex; flex-direction: column; transition: box-shadow 0.2s, transform 0.2s; }
+.market-card:hover { box-shadow: var(--shadow-card-hover); transform: translateY(-2px); }
+.market-icon { width: 48px; height: 48px; border-radius: var(--radius-md); color: #ffffff; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; margin-bottom: var(--spacing-md); }
+.market-info { flex: 1; }
+.market-title { font-size: 16px; font-weight: bold; color: var(--color-text-primary); margin-bottom: 8px; }
+.market-desc { font-size: 13px; color: var(--color-text-secondary); line-height: 1.5; margin-bottom: 12px; }
+.market-meta { display: flex; gap: 12px; font-size: 12px; color: var(--color-text-muted); }
+.market-meta .category { background: var(--color-primary-light); color: var(--color-primary); padding: 2px 8px; border-radius: var(--radius-sm); }
+.market-footer { margin-top: var(--spacing-md); display: flex; justify-content: flex-end; }
 .restart-overlay { position: fixed; inset: 0; background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; }
 .spinner { width: 40px; height: 40px; border: 4px solid var(--color-border); border-top-color: var(--color-primary); border-radius: 50%; animation: spin 1s linear infinite; }
 .restart-text { margin-top: var(--spacing-md); color: var(--color-primary); font-weight: bold; font-size: var(--font-size-body); }
 @keyframes spin { to { transform: rotate(360deg); } }
-
-/* =========================================
-   暗色模式专属修复
-   ========================================= */
-[data-theme="dark"] .restart-overlay {
-  background: rgba(0, 0, 0, 0.85);
-}
-[data-theme="dark"] .market-card {
-  background: var(--color-bg-card);
-}
+[data-theme="dark"] .restart-overlay { background: rgba(0, 0, 0, 0.85); }
+[data-theme="dark"] .market-card { background: var(--color-bg-card); }
 </style>

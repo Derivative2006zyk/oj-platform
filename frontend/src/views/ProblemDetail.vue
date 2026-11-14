@@ -447,6 +447,9 @@
       </aside>
     </div>
   </main>
+  <!-- 悬浮 AI 按钮 -->
+  <button v-if="!showAI" class="ai-float-btn" @click="showAI = true">AI</button>
+  <AIChatPanel v-if="showAI" @close="showAI = false" />
 </template>
 
 <script setup lang="ts">
@@ -469,6 +472,7 @@ import { openSubmissionWS, type SubmissionWSHandle, type WSMessage } from '../ut
 import { useUserStore } from '../stores/user'
 import { loadDraft, saveDraft, clearDraft, type DraftImage } from '../utils/draft'
 import { setCache, getCache } from '../utils/cache'
+import AIChatPanel from '../components/AIChatPanel.vue'
 
 const route = useRoute()
 const userStore = useUserStore()
@@ -477,6 +481,7 @@ const problemId = computed(() => Number(route.params.id))
 
 const loading = ref(true)
 const isOffline = ref(false)
+const showAI = ref(false)
 const problem = ref<ProblemDetail | null>(null)
 
 const answer = ref<{ answer?: string | null; explanation?: string | null } | null>(null)
@@ -1970,5 +1975,21 @@ onMounted(() => {
 
 [data-theme="dark"] .back-link:hover {
   background: rgba(255, 255, 255, 0.05);
+}
+
+.ai-float-btn {
+  position: fixed;
+  right: 30px;
+  bottom: 30px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: white;
+  font-weight: bold;
+  border: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  cursor: pointer;
+  z-index: 999;
 }
 </style>
