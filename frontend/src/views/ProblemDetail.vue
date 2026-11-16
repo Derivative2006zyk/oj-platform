@@ -26,7 +26,12 @@
           </header>
 
           <section class="desc-section">
-            <h2>题目描述</h2>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-sm);">
+              <h2 style="margin: 0;">题目描述</h2>
+              <button class="btn-ghost" style="padding: 4px 10px; font-size: 13px;" @click="onExplainProblem">
+                AI 解析本题
+              </button>
+            </div>
             <MarkdownRenderer :content="problem.description" />
           </section>
 
@@ -410,6 +415,16 @@
               {{ submitting ? '提交中...' : '提交' }}
             </button>
 
+            <!-- 【新增】AI 批改按钮 -->
+            <button 
+              class="btn-ghost" 
+              style="margin-top: 8px; width: 100%;"
+              :disabled="!canSubmitProof" 
+              @click="onAiJudgeProof"
+            >
+              让 AI 批改我的证明
+            </button>
+
             <div v-if="currentSubmission" class="submission-result">
               <div class="result-row">
                 <span class="result-label">状态</span>
@@ -447,13 +462,14 @@
       </aside>
     </div>
   </main>
+  
   <!-- 悬浮 AI 按钮 -->
   <button v-if="!showAI" class="ai-float-btn" @click="showAI = true">AI</button>
-  <AIChatPanel v-if="showAI" @close="showAI = false" />
+  <AIChatPanel v-if="showAI" ref="aiPanelRef" @close="showAI = false" />
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { Capacitor } from '@capacitor/core'
 import { ScreenOrientation } from '@capacitor/screen-orientation'
@@ -482,6 +498,7 @@ const problemId = computed(() => Number(route.params.id))
 const loading = ref(true)
 const isOffline = ref(false)
 const showAI = ref(false)
+const aiPanelRef = ref<any>(null) // 【新增】AI 面板引用
 const problem = ref<ProblemDetail | null>(null)
 
 const answer = ref<{ answer?: string | null; explanation?: string | null } | null>(null)
@@ -1043,6 +1060,29 @@ function openWS(submissionId: number) {
       console.warn('WS error', e)
     }
   )
+}
+
+// ===== AI 业务联动逻辑 =====
+function onExplainProblem() {
+  if (!problem.value) return
+  showAI.value = true 
+  
+  const prompt = `请帮我解析这道题，给出详细的解题思路和关键步骤：\n\n【题目】${problem.value.title}\n【描述】\n${problem.value.description}`
+  
+  nextTick(() => {
+    aiPanelRef.value?.triggerQuery(prompt)
+  })
+}
+
+function onAiJudgeProof() {
+  if (!problem.value || !proofText.value.trim()) return
+  showAI.value = true
+  
+  const prompt = `我正在做一道证明题。\n【题目】${problem.value.title}\n【描述】\n${problem.value.description}\n\n【我的证明过程】\n${proofText.value}\n\n请你作为专业的数学老师，帮我批改这段证明，指出逻辑漏洞、不严谨的地方，并给出修改建议。`
+  
+  nextTick(() => {
+    aiPanelRef.value?.triggerQuery(prompt)
+  })
 }
 
 onMounted(() => {
