@@ -34,12 +34,13 @@ async def list_problems(
     tag: str = Query(None),
     keyword: str = Query(None),
     bank_id: int = Query(None),
+    paper_id: str = Query(None), # 【新增】接收前端传来的 paper_id
     unassigned: bool = Query(False),
     db: AsyncSession = Depends(get_db),
 ):
     return await service.get_problem_list(
         db, page, page_size, category_id, difficulty, type, tag, keyword,
-        bank_id=bank_id, unassigned=unassigned,
+        bank_id=bank_id, paper_id=paper_id, unassigned=unassigned,
     )
 
 @router.get("/problems/{problem_id}")

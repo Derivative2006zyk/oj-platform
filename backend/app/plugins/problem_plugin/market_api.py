@@ -22,6 +22,7 @@ _install_status = {}
 
 class InstallRequest(BaseModel):
     download_url: str
+    plugin_name: str = "ocr_plugin"
 
 
 @router.get("/market/plugins")
@@ -54,6 +55,15 @@ async def get_market_plugins():
             "description": "接入大语言模型，提供代码解释、证明题批改和智能问答。",
             "download_url": "",
             "category": "智能化"
+        },
+                {
+            "name": "llm_ocr_plugin",
+            "display_name": "云端 AI 视觉 OCR",
+            "version": "0.3.0",
+            "author": "OJ Team",
+            "description": "调用多模态大模型进行高精度识别，完美支持中英混排与 LaTeX 公式。",
+            "download_url": "http://host.docker.internal:9000/llm_ocr_plugin.ojplugin",
+            "category": "工具"
         }
     ]
 
@@ -131,7 +141,7 @@ async def install_plugin(
     req: InstallRequest,
     current_user: User = Depends(require_admin),
 ):
-    tmp_name = "ocr_plugin"
+    tmp_name = req.plugin_name # 【修复】使用前端传来的真实插件名
     if _install_status.get(tmp_name, {}).get("status") in ["downloading", "extracting", "installing_deps", "starting_service"]:
         raise HTTPException(status_code=409, detail="Installation already in progress")
         

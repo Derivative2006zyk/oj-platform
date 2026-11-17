@@ -66,3 +66,32 @@ async def import_bank(
         raise HTTPException(status_code=400, detail=str(e))
 
     return result
+
+
+from app.models.paper import Paper
+from pydantic import BaseModel
+from sqlalchemy import select
+
+class PaperCreate(BaseModel):
+    name: str
+    bank_id: int
+
+@router.post("/admin/papers")
+async def create_paper(
+    data: PaperCreate, 
+    db: AsyncSession = Depends(get_db),
+    _: str = Depends(verify_admin_key)
+):
+    paper = Paper(name=data.name, bank_id=data.bank_id)
+    db.add(paper)
+    await db.commit()
+    await db.refresh(paper)
+    return paper
+
+@router.get("/papers")
+async def list_papers(bank_id: int = None, db: AsyncSession = Depends(get_db)):
+    query = select(Paper)
+    if bank_id:
+        query = query.where(Paper.bank_id == bank_id)
+    result = await db.execute(query.order_by(Paper.sort_order, Paper.id))
+    return result.scalars().all()

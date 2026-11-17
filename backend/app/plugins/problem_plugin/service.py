@@ -26,62 +26,44 @@ async def get_problem_list(
     tag: str = None,
     keyword: str = None,
     bank_id: int = None,
+    paper_id: str = None, # 【新增】
     unassigned: bool = False,
 ):
     query = select(Problem)
-    if category_id:
-        query = query.where(Problem.category_id == category_id)
-    if difficulty:
-        query = query.where(Problem.difficulty == difficulty)
-    if type:
-        query = query.where(Problem.type == type)
-    if tag:
-        query = query.where(Problem.tags.contains([tag]))
-    if keyword:
-        query = query.where(Problem.title.ilike(f"%{keyword}%"))
-    if bank_id is not None:
-        query = query.where(Problem.bank_id == bank_id)
-    if unassigned:
-        query = query.where(Problem.bank_id.is_(None))
+    if category_id: query = query.where(Problem.category_id == category_id)
+    if difficulty: query = query.where(Problem.difficulty == difficulty)
+    if type: query = query.where(Problem.type == type)
+    if tag: query = query.where(Problem.tags.contains([tag]))
+    if keyword: query = query.where(Problem.title.ilike(f"%{keyword}%"))
+    if bank_id is not None: query = query.where(Problem.bank_id == bank_id)
+    if unassigned: query = query.where(Problem.bank_id.is_(None))
+    
+    # 【新增】处理试卷筛选
+    if paper_id is not None:
+        if paper_id == "none":
+            query = query.where(Problem.paper_id.is_(None)) # 仅看散题
+        else:
+            query = query.where(Problem.paper_id == int(paper_id)) # 看具体试卷
 
     count_query = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_query)).scalar()
 
-    query = (
-        query.order_by(Problem.id.desc())
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-    )
+    query = query.order_by(Problem.id.desc()).offset((page - 1) * page_size).limit(page_size)
     result = await db.execute(query)
     problems = result.scalars().all()
 
-    return {
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "items": problems,
-    }
+    return {"total": total, "page": page, "page_size": page_size, "items": problems}
 
 async def get_problem_detail(db: AsyncSession, problem_id: int):
     problem = await db.get(Problem, problem_id)
-    if not problem:
-        return None
-
+    if not problem: return None
     detail = {
-        "id": problem.id,
-        "title": problem.title,
-        "description": problem.description,
-        "type": problem.type,
-        "difficulty": problem.difficulty,
-        "tags": problem.tags,
-        "category_id": problem.category_id,
-        "bank_id": problem.bank_id,
-        "explanation": problem.explanation,
-        "options": problem.options,
-        "blanks": problem.blanks,
-        "test_cases": [],
-        "subprojects": [],
-        "version": problem.version, # 【新增】吐出 version
+        "id": problem.id, "title": problem.title, "description": problem.description,
+        "type": problem.type, "difficulty": problem.difficulty, "tags": problem.tags,
+        "category_id": problem.category_id, "bank_id": problem.bank_id, 
+        "paper_id": problem.paper_id, # 【新增】
+        "explanation": problem.explanation, "options": problem.options, "blanks": problem.blanks,
+        "test_cases": [], "subprojects": [], "version": problem.version,
     }
 
     if problem.type == "algorithm":
@@ -128,18 +110,11 @@ async def get_all_tags(db: AsyncSession):
 
 async def create_problem(db: AsyncSession, data: ProblemCreate):
     problem = Problem(
-        title=data.title,
-        category_id=data.category_id,
-        bank_id=data.bank_id,
-        description=data.description,
-        type=data.type,
-        difficulty=data.difficulty,
-        tags=data.tags,
-        answer=data.answer,
-        explanation=data.explanation,
-        options=data.options,
-        blanks=data.blanks,
-        version=1, # 初始化版本号
+        title=data.title, category_id=data.category_id, bank_id=data.bank_id,
+        paper_id=data.paper_id, # 【新增】
+        description=data.description, type=data.type, difficulty=data.difficulty,
+        tags=data.tags, answer=data.answer, explanation=data.explanation,
+        options=data.options, blanks=data.blanks, version=1,
     )
     db.add(problem)
     await db.flush()
