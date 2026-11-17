@@ -1,0 +1,13 @@
+{
+  "name": "llm_ocr_plugin",
+  "display_name": "云端 AI 视觉 OCR",
+  "version": "0.3.0",
+  "author": "OJ Team",
+  "description": "调用多模态大模型进行高精度识别，完美支持中英混排与 LaTeX 公式，无需本地显卡。",
+  "ui_manifest": {
+    "menu_name": "AI 拍照录题",
+    "route_path": "/plugin/llm_ocr_plugin",
+    "icon": "camera",
+    "order": 20
+  }
+}
