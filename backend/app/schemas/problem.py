@@ -31,6 +31,7 @@ class ProblemCreate(BaseModel):
     blanks: Optional[List[dict]] = None
     test_cases: List[TestCaseCreate] = []
     subprojects: List[SubprojectCreate] = []
+    paper_id: Optional[int] = None
 
 
 class ProblemUpdate(BaseModel):
@@ -47,8 +48,7 @@ class ProblemUpdate(BaseModel):
     blanks: Optional[List[dict]] = None
     test_cases: Optional[List[TestCaseCreate]] = None
     subprojects: Optional[List[SubprojectCreate]] = None
-    
-    # 【新增】必须传 version 才能更新
+    paper_id: Optional[int] = None
     version: int
 
 
@@ -77,8 +77,7 @@ class ProblemDetail(BaseModel):
     blanks: Optional[List[dict]] = None
     test_cases: List[dict] = []
     subprojects: List[dict] = []
-    
-    # 【新增】返回 version 给前端
+    paper_id: Optional[int] = None
     version: int
     
     model_config = ConfigDict(from_attributes=True)

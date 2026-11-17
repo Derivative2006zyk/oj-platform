@@ -12,6 +12,9 @@ class Problem(Base):
     bank_id: Mapped[int] = mapped_column(
         ForeignKey("banks.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    paper_id: Mapped[int] = mapped_column(
+        ForeignKey("papers.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     description: Mapped[str] = mapped_column(Text, nullable=False)
     type: Mapped[str] = mapped_column(String(20), nullable=False)
     difficulty: Mapped[int] = mapped_column(Integer, nullable=False)
