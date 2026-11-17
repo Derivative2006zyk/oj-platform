@@ -237,7 +237,13 @@ async function onInstallPlugin(plugin: any) {
   installing.value = true; installingPluginName.value = plugin.name; installStatus.value = 'starting'
   try {
     const adminKey = localStorage.getItem('admin_key') || ''
-    await api.post('/admin/market/install', { download_url: plugin.download_url }, { headers: { 'X-Admin-Key': adminKey } })
+    await api.post('/admin/market/install', 
+      { 
+        download_url: plugin.download_url,
+        plugin_name: plugin.name // 【修复】把真实名字传给后端
+      }, 
+      { headers: { 'X-Admin-Key': adminKey } }
+    )
     let retries = 300
     pollTimer = window.setInterval(async () => {
       try {

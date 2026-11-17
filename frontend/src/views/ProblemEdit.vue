@@ -30,7 +30,7 @@
     </div>
 
     <div class="form-group">
-      <label>所属题库（可选）</label>
+      <label>所属题库（分组）（可选）</label>
       <select v-model.number="form.bank_id">
         <option :value="null">不归属任何题库</option>
         <option v-for="b in banks" :key="b.id" :value="b.id">
@@ -38,6 +38,15 @@
         </option>
       </select>
       <small class="hint">题库可在题库列表页按组查看和筛选</small>
+    </div>
+
+    <!-- 【新增】所属试卷 -->
+    <div class="form-group" v-if="form.bank_id">
+      <label>所属试卷（可选）</label>
+      <select v-model.number="form.paper_id">
+        <option :value="null">散题（不归属试卷）</option>
+        <option v-for="p in papers" :key="p.id" :value="p.id">{{ p.name }}</option>
+      </select>
     </div>
 
     <div class="form-group">
@@ -180,7 +189,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   getCategories,
@@ -192,7 +201,8 @@ import {
   type Category
 } from '../api/problem'
 import { listBanks, type Bank } from '../api/bank'
-import { getCache } from '../utils/cache' // 【新增】引入缓存工具
+import { getCache } from '../utils/cache'
+import api from '../utils/axios' // 【新增】用于请求试卷
 
 const route = useRoute()
 const router = useRouter()
@@ -202,6 +212,7 @@ const isEdit = computed(() => route.params.id !== undefined && route.params.id !
 const adminKey = ref(localStorage.getItem('admin_key') || 'admin-key-change-me')
 const categories = ref<Category[]>([])
 const banks = ref<Bank[]>([])
+const papers = ref<any[]>([]) // 【新增】试卷列表
 const tagsInput = ref('')
 const submitting = ref(false)
 const uploadingImage = ref(false)
@@ -210,6 +221,7 @@ const form = reactive({
   title: '',
   category_id: 1,
   bank_id: null as number | null,
+  paper_id: null as number | null, // 【新增】
   type: 'algorithm',
   difficulty: 1,
   description: '',
@@ -219,7 +231,23 @@ const form = reactive({
   options: [] as any[],
   blanks: [] as any[],
   subprojects: [] as any[],
-  version: 1 // 【注意】乐观锁版本号
+  version: 1
+})
+
+// 【新增】监听题库选择，拉取对应试卷
+watch(() => form.bank_id, async (newBankId) => {
+  form.paper_id = null
+  if (!newBankId) {
+    papers.value = []
+    return
+  }
+  try {
+    const res = await api.get(`/papers?bank_id=${newBankId}`)
+    papers.value = res.data
+  } catch (e) {
+    console.warn('加载试卷列表失败', e)
+    papers.value = []
+  }
 })
 
 // ===================== 测试用例 =====================
@@ -303,6 +331,7 @@ function buildSubmitData() {
     title: form.title.trim(),
     category_id: form.category_id,
     bank_id: form.bank_id,
+    paper_id: form.paper_id, // 【新增】
     type: form.type,
     difficulty: form.difficulty,
     description: form.description,
@@ -312,7 +341,7 @@ function buildSubmitData() {
       .split(',')
       .map(t => t.trim())
       .filter(t => t),
-    version: form.version // 【乐观锁】
+    version: form.version
   }
 
   if (form.type === 'algorithm') {
@@ -400,7 +429,6 @@ async function submit() {
     if (isEdit.value) {
       const res = await updateProblem(Number(route.params.id), data)
       
-      // 【离线支持】检查是否是离线保存
       if (res && (res as any).message === 'offline-saved') {
         alert('当前无网络，修改已保存至本地队列。网络恢复后将自动同步。')
       } else {
@@ -412,7 +440,6 @@ async function submit() {
     }
     router.push('/')
   } catch (e: any) {
-    // 【冲突处理】处理乐观锁 409 冲突
     if (e.response?.status === 409) {
       alert(e.response.data.detail || '保存失败：该题目已被其他设备修改，请刷新后重试。')
       return
@@ -434,12 +461,13 @@ function applyDetailToForm(detail: any) {
   form.title = detail.title || ''
   form.category_id = detail.category_id || 1
   form.bank_id = detail.bank_id ?? null
+  form.paper_id = detail.paper_id ?? null // 【新增】
   form.type = detail.type || 'algorithm'
   form.difficulty = detail.difficulty || 1
   form.description = detail.description || ''
   form.explanation = detail.explanation || ''
   tagsInput.value = Array.isArray(detail.tags) ? detail.tags.join(',') : ''
-  form.version = detail.version || 1 // 回填 version
+  form.version = detail.version || 1
 
   if (detail.type === 'algorithm') {
     form.test_cases = Array.isArray(detail.test_cases)
@@ -487,7 +515,6 @@ function applyDetailToForm(detail: any) {
 
 // ===================== 初始化（离线优先） =====================
 onMounted(async () => {
-  // 1. 拉取分类和题库（如果断网则静默失败，不阻断后续流程）
   try {
     const [cats, bs] = await Promise.all([getCategories(), listBanks()])
     categories.value = Array.isArray(cats) ? cats : []
@@ -505,17 +532,23 @@ onMounted(async () => {
     return
   }
 
-  // 2. 先尝试从缓存读取详情并渲染
   const cacheKeyDetail = `oj_problem_detail_${id}`
   const cachedDetail = getCache<any>(cacheKeyDetail)
   if (cachedDetail) {
     applyDetailToForm(cachedDetail)
   }
 
-  // 3. 发起网络请求更新数据
   try {
     const detail = await getProblemDetail(id)
     applyDetailToForm(detail)
+    
+    // 当回填数据后，如果带有 bank_id，需要拉取一次对应的试卷列表
+    if (form.bank_id) {
+      try {
+        const papersRes = await api.get(`/papers?bank_id=${form.bank_id}`)
+        papers.value = papersRes.data
+      } catch (err) { console.warn('拉取试卷列表失败', err) }
+    }
 
     try {
       const answerData = await getProblemAnswer(id)
@@ -524,7 +557,6 @@ onMounted(async () => {
         form.explanation = answerData.explanation
       }
     } catch (e) {
-      // 如果答案接口失败，尝试读缓存
       const cachedAns = getCache<any>(`oj_problem_answer_${id}`)
       if (cachedAns) {
         form.answer = cachedAns.answer || ''

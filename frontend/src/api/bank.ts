@@ -96,3 +96,23 @@ export async function importBank(
   })
   return res.data
 }
+
+export interface Paper {
+  id: number
+  name: string
+  bank_id: number
+  sort_order: number
+}
+
+export async function listPapers(bankId: number): Promise<Paper[]> {
+  const res = await api.get<Paper[]>(`/papers?bank_id=${bankId}`)
+  return res.data
+}
+
+export async function createPaper(data: { name: string, bank_id: number }): Promise<Paper> {
+  const adminKey = localStorage.getItem('admin_key') || ''
+  const res = await api.post<Paper>('/admin/papers', data, {
+    headers: { 'X-Admin-Key': adminKey },
+  })
+  return res.data
+}
