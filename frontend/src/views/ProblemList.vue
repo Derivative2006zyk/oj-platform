@@ -394,7 +394,6 @@ async function onCreatePaper() {
   const name = prompt('请输入新试卷的名称 (例如：2024年新课标一卷)：')
   if (!name || !name.trim()) return
   try {
-    const adminKey = localStorage.getItem('admin_key') || ''
     const res = await createPaper({ name: name.trim(), bank_id: selectedBank.value })
     papers.value.push(res)
     alert('试卷创建成功！您可以开始录入题目并选择该试卷了。')
