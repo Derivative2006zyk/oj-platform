@@ -14,12 +14,9 @@ let syncHandler: () => void
 
 onMounted(() => {
   initOfflineQueue()
-  // 如果启动时正好有网，尝试同步一次（防止上次断网没发出去的）
   if (navigator.onLine) {
     processQueue()
   }
-  
-  // 监听同步完成事件，如果在某些特定页面可能需要刷新数据
   syncHandler = () => {
     console.log('检测到队列同步完成，当前页面数据将更新')
   }
@@ -44,8 +41,7 @@ html,
 body {
   min-height: 100%;
   width: 100%;
-  /* 允许双指放大后出现横向滚动条 */
-  overflow-x: auto;
+  /* 移除 overflow-x: auto，避免 body 成为滚动容器导致 sticky 失效 */
 }
 
 body {
@@ -55,7 +51,6 @@ body {
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   background-color: var(--color-bg-page);
-  /* 防止放大时触摸变成选中文本（可选，防止误触） */
   -webkit-touch-callout: none;
 }
 
@@ -64,13 +59,21 @@ body {
   display: flex;
   flex-direction: column;
   width: 100%;
-  overflow-x: auto;
-  /* 确保内容区撑满 */
-  min-width: 100vw; 
+  /* 移除 min-width: 100vw 和 overflow-x: auto，横向溢出交给具体元素自己控制 */
 }
 
 a {
   color: inherit;
   text-decoration: none;
+}
+
+pre {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
 }
 </style>

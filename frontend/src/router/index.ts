@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHashHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 
 const routes: RouteRecordRaw[] = [
@@ -24,7 +24,6 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/Register.vue'),
     meta: { guestOnly: true },
   },
-  // 设置页：允许免登录访问（用于未连接后端时配置 IP）
   {
     path: '/settings',
     name: 'settings',
@@ -66,7 +65,6 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/AdminStats.vue'),
     meta: { requiresAuth: true, requiresAdmin: true },
   },
-  // 动态插件占位路由（Day 46 新增）
   {
     path: '/plugin/:name',
     name: 'plugin-view',
@@ -80,7 +78,7 @@ const routes: RouteRecordRaw[] = [
 ]
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHashHistory(), // 【核心修复】改用 Hash 模式，兼容移动端
   routes,
 })
 
@@ -98,19 +96,16 @@ router.beforeEach((to, _from, next) => {
     }
   }
 
-  // 需要登录
   if (to.meta.requiresAuth && !token) {
     next({ path: '/login', query: { redirect: to.fullPath } })
     return
   }
 
-  // 需要管理员
   if (to.meta.requiresAdmin && !isAdmin) {
     next('/')
     return
   }
 
-  // 仅游客
   if (to.meta.guestOnly && token) {
     next('/')
     return

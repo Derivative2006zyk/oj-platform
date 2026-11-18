@@ -13,7 +13,6 @@
           </template>
         </template>
         
-        <!-- 动态插件菜单 -->
         <template v-for="p in pluginStore.plugins" :key="p.name">
           <router-link
             v-if="p.enabled !== false && p.show_in_nav !== false"
@@ -26,7 +25,6 @@
       </nav>
 
       <div class="right-section">
-        <!-- 主题切换按钮 -->
         <button class="theme-toggle" @click="toggleTheme" :title="isDark ? '切换亮色' : '切换暗色'">
           {{ isDark ? '亮色' : '暗色' }}
         </button>
@@ -60,24 +58,21 @@ import { onMounted, ref } from 'vue'
 import { usePluginStore } from '../stores/plugin'
 
 const pluginStore = usePluginStore()
+const router = useRouter()
+const userStore = useUserStore()
 
 onMounted(() => {
   pluginStore.fetchPlugins()
 })
-
-const router = useRouter()
-const userStore = useUserStore()
 
 function onLogout() {
   userStore.logout()
   router.push('/')
 }
 
-// ===== 主题切换逻辑 =====
 const isDark = ref(false)
 
 onMounted(() => {
-  // 初始化状态
   isDark.value = document.documentElement.hasAttribute('data-theme')
 })
 
@@ -118,7 +113,6 @@ function toggleTheme() {
   align-items: center;
   justify-content: space-between;
   gap: var(--spacing-sm);
-  /* 防止内部元素撑开父级 */
   min-width: 0;
 }
 
@@ -130,16 +124,14 @@ function toggleTheme() {
   flex-shrink: 0;
 }
 
-/* 导航链接区 */
 .nav-links {
   display: flex;
   gap: clamp(8px, 2vw, 24px);
   flex-wrap: nowrap;
   align-items: center;
-  /* 允许横向滚动 */
   overflow-x: auto;
   scrollbar-width: none;
-  flex-shrink: 1;
+  flex: 1 1 0;
   min-width: 0;
 }
 
@@ -156,10 +148,10 @@ function toggleTheme() {
   cursor: pointer;
   transition: background 0.2s, color 0.2s;
   flex-shrink: 0;
+  text-decoration: none;
 }
 
 .nav-link:hover {
-  /* 使用 CSS 变量代替写死的 rgba(0,0,0) 保证暗色下正常 */
   background: var(--color-primary-light);
   color: var(--color-text-primary);
 }
@@ -181,7 +173,6 @@ function toggleTheme() {
   flex-shrink: 0;
 }
 
-/* ===== 主题切换按钮 ===== */
 .theme-toggle {
   background: transparent;
   border: 1px solid var(--color-border);
@@ -207,6 +198,7 @@ function toggleTheme() {
   border-radius: var(--radius-md);
   transition: background 0.2s;
   flex-shrink: 0;
+  text-decoration: none;
 }
 
 .user-area:hover {
@@ -249,25 +241,14 @@ function toggleTheme() {
   color: var(--color-danger-text);
 }
 
-/* ===== 移动端深度适配 ===== */
 @media (max-width: 768px) {
-  .brand {
-    font-size: 16px;
+  .navbar-content {
+    padding: 0 var(--spacing-sm);
+    gap: 4px;
   }
-  
-  .username,
-  .badge {
-    display: none; /* 手机上隐藏用户名和徽章，只留头像 */
-  }
-
-  .nav-link {
-    font-size: 13px;
-    padding: 6px;
-  }
-
-  .theme-toggle {
-    padding: 4px 6px;
-    font-size: 12px;
-  }
+  .brand { font-size: 16px; }
+  .username, .badge { display: none; }
+  .nav-link { font-size: 13px; padding: 6px; }
+  .theme-toggle { padding: 3px 8px; font-size: 12px; margin-right: 4px; }
 }
 </style>
