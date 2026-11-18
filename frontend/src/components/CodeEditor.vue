@@ -1,6 +1,6 @@
 <template>
   <div class="code-editor-root" :style="{ height: height }">
-    
+
     <!-- ===== 移动端专属方案：原生输入 + 工具栏 ===== -->
     <div v-if="isMobile" class="mobile-editor-wrapper">
       <textarea
@@ -11,25 +11,24 @@
         spellcheck="false"
         @input="onMobileInput"
       ></textarea>
-      
-      <!-- 移动端快捷符号工具栏 (沉浸式) -->
+
       <div class="mobile-toolbar">
-        <button @click="insertText('\t')">Tab</button>
-        <button @click="insertText('{')">{</button>
-        <button @click="insertText('}')">}</button>
-        <button @click="insertText('(')">(</button>
-        <button @click="insertText(')')">)</button>
-        <button @click="insertText('[')">[</button>
-        <button @click="insertText(']')">]</button>
-        <button @click="insertText(';')">;</button>
-        <button @click="insertText('\'')">'</button>
-        <button @click="insertText('&quot;')">"</button>
-        <button @click="insertText(':')">:</button>
-        <button @click="insertText('\n')">↵</button>
+        <button type="button" @click="insertText('\t')">Tab</button>
+        <button type="button" @click="insertText('{')">{</button>
+        <button type="button" @click="insertText('}')">}</button>
+        <button type="button" @click="insertText('(')">(</button>
+        <button type="button" @click="insertText(')')">)</button>
+        <button type="button" @click="insertText('[')">[</button>
+        <button type="button" @click="insertText(']')">]</button>
+        <button type="button" @click="insertText(';')">;</button>
+        <button type="button" @click="insertText('\'')">'</button>
+        <button type="button" @click="insertText('&quot;')">"</button>
+        <button type="button" @click="insertText(':')">:</button>
+        <button type="button" @click="insertText('\n')">↵</button>
       </div>
     </div>
 
-    <!-- ===== 桌面端方案：Monaco Editor ===== -->
+    <!-- ===== 桌面端方案：Monaco Editor（懒加载） ===== -->
     <div v-else ref="editorContainer" class="monaco-container"></div>
 
   </div>
@@ -37,14 +36,8 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted, computed, nextTick } from 'vue'
-import * as monaco from 'monaco-editor/esm/vs/editor/editor.api'
-import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
-
-self.MonacoEnvironment = {
-  getWorker() {
-    return new EditorWorker()
-  },
-}
+// 只引入类型，不会打包 Monaco 到 JS
+import type * as Monaco from 'monaco-editor/esm/vs/editor/editor.api'
 
 const props = defineProps<{
   modelValue: string
@@ -60,8 +53,7 @@ const isMobile = computed(() => {
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
 })
 
-// 获取当前是否暗色主题
-function getCurrentTheme() {
+function getCurrentTheme(): string {
   return document.documentElement.hasAttribute('data-theme') ? 'vs-dark' : 'vs'
 }
 
@@ -73,7 +65,6 @@ function onMobileInput() {
   emit('update:modelValue', codeText.value)
 }
 
-// 插入符号并处理 Tab 缩进
 function insertText(text: string) {
   const el = textareaRef.value
   if (!el) return
@@ -92,25 +83,40 @@ function insertText(text: string) {
 
   codeText.value = el.value
   emit('update:modelValue', el.value)
-  
+
   nextTick(() => {
     el.focus()
   })
 }
 
-// ===== 桌面端 Monaco 逻辑 =====
+// ===== 桌面端 Monaco 逻辑（懒加载） =====
 const editorContainer = ref<HTMLElement | null>(null)
-let editorInstance: monaco.editor.IStandaloneCodeEditor | null = null
+let monacoApi: typeof Monaco | null = null
+let editorInstance: Monaco.editor.IStandaloneCodeEditor | null = null
 let resizeObserver: ResizeObserver | null = null
 let themeObserver: MutationObserver | null = null
 
-onMounted(() => {
+onMounted(async () => {
   if (isMobile.value || !editorContainer.value) return
 
-  editorInstance = monaco.editor.create(editorContainer.value, {
+  // 动态加载 Monaco 与 Worker，移动端不会触发这段代码
+  const monacoModule = await import('monaco-editor/esm/vs/editor/editor.api')
+  const EditorWorkerCtor = (await import('monaco-editor/esm/vs/editor/editor.worker?worker')).default as new () => Worker
+  monacoApi = monacoModule
+
+  self.MonacoEnvironment = {
+    getWorker() {
+      return new EditorWorkerCtor()
+    },
+  }
+
+  // 组件可能在 await 期间被卸载
+  if (!editorContainer.value) return
+
+  editorInstance = monacoModule.editor.create(editorContainer.value, {
     value: props.modelValue,
     language: props.language,
-    theme: getCurrentTheme(), // 跟随全局主题
+    theme: getCurrentTheme(),
     automaticLayout: false,
     minimap: { enabled: false },
     scrollBeyondLastLine: false,
@@ -125,7 +131,7 @@ onMounted(() => {
     folding: false,
     renderLineHighlight: 'none',
     guides: { indentation: false },
-    padding: { top: 12, bottom: 12 }
+    padding: { top: 12, bottom: 12 },
   })
 
   editorInstance.onDidChangeModelContent(() => {
@@ -143,8 +149,8 @@ onMounted(() => {
   // 监听暗色模式切换
   themeObserver = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
-      if (mutation.attributeName === 'data-theme') {
-        monaco.editor.setTheme(getCurrentTheme())
+      if (mutation.attributeName === 'data-theme' && monacoApi) {
+        monacoApi.editor.setTheme(getCurrentTheme())
       }
     })
   })
@@ -173,9 +179,9 @@ watch(() => props.modelValue, (newVal) => {
 })
 
 watch(() => props.language, (newLang) => {
-  if (!isMobile.value && editorInstance) {
+  if (!isMobile.value && editorInstance && monacoApi) {
     const model = editorInstance.getModel()
-    if (model) monaco.editor.setModelLanguage(model, newLang)
+    if (model) monacoApi.editor.setModelLanguage(model, newLang)
   }
 })
 </script>
@@ -188,7 +194,6 @@ watch(() => props.language, (newLang) => {
   background: var(--color-bg-card);
   display: flex;
   flex-direction: column;
-  /* 统一边框颜色 */
   border: 1px solid var(--color-border);
 }
 
@@ -223,6 +228,7 @@ watch(() => props.language, (newLang) => {
   box-sizing: border-box;
   white-space: pre;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* 移动端快捷符号工具栏 */
@@ -235,6 +241,7 @@ watch(() => props.language, (newLang) => {
   overflow-x: auto;
   scrollbar-width: none;
   flex-shrink: 0;
+  -webkit-overflow-scrolling: touch;
 }
 
 .mobile-toolbar::-webkit-scrollbar {
@@ -251,6 +258,7 @@ watch(() => props.language, (newLang) => {
   color: var(--color-text-primary);
   white-space: nowrap;
   box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  flex-shrink: 0;
 }
 
 .mobile-toolbar button:active {

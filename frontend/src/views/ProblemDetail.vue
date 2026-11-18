@@ -1284,6 +1284,7 @@ onMounted(() => {
   font-weight: var(--font-weight-bold);
   color: var(--color-text-primary);
   margin-bottom: var(--spacing-sm);
+  word-break: break-word;
 }
 
 .meta {
@@ -1421,6 +1422,7 @@ onMounted(() => {
   margin: 0;
   white-space: pre-wrap;
   line-height: 1.7;
+  overflow-x: auto;
 }
 
 .subproject {
@@ -1778,8 +1780,7 @@ onMounted(() => {
   min-height: 200px;
   max-height: 800px;
   height: 360px;
-  /* 确保编辑器区域不会出现白色背景 */
-  background: var(--color-bg-card); 
+  background: var(--color-bg-card);
 }
 
 .choice-options {
@@ -1997,7 +1998,6 @@ onMounted(() => {
   background: #2a2a2a !important;
 }
 
-/* 状态标签在暗色下的高对比度修复 */
 [data-theme="dark"] .status-PENDING { background: rgba(156, 163, 175, 0.2) !important; color: #d1d5db !important; }
 [data-theme="dark"] .status-AC { background: rgba(16, 185, 129, 0.2) !important; color: #34d399 !important; }
 [data-theme="dark"] .status-WA { background: rgba(239, 68, 68, 0.2) !important; color: #f87171 !important; }
@@ -2031,5 +2031,33 @@ onMounted(() => {
   box-shadow: 0 4px 12px rgba(0,0,0,0.2);
   cursor: pointer;
   z-index: 999;
+}
+
+/* ===== 移动端适配 ===== */
+@media (max-width: 600px) {
+  .problem-page {
+    padding: var(--spacing-md) 0;
+  }
+  .content-wrapper {
+    padding: 0 var(--spacing-md);
+    gap: var(--spacing-md);
+  }
+  .problem-card {
+    padding: var(--spacing-md);
+  }
+  .editor-wrapper {
+    min-width: 0;
+    height: 300px;
+    resize: none;
+    margin: 0;
+  }
+  .proof-textarea-wrapper {
+    min-width: 0;
+    resize: none;
+  }
+  .ai-float-btn {
+    right: 16px;
+    bottom: 16px;
+  }
 }
 </style>

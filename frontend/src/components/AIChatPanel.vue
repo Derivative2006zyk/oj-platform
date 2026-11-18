@@ -1,6 +1,6 @@
 <template>
-  <div class="ai-panel" :style="{ width: panelWidth + 'px', height: panelHeight + 'px' }">
-    <div class="resize-handle-top-left" @mousedown="startResize"></div>
+  <div class="ai-panel" :style="panelStyle">
+    <div v-if="!isMobile" class="resize-handle-top-left" @mousedown="startResize"></div>
     <div class="ai-header">
       <span>AI 助教</span>
       <button @click="$emit('close')">×</button>
@@ -23,7 +23,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, onUnmounted } from 'vue'
+import { ref, nextTick, onUnmounted, computed } from 'vue'
 import { streamChat, type ChatMessage } from '../api/ai'
 import MarkdownRenderer from './MarkdownRenderer.vue'
 
@@ -33,10 +33,19 @@ const input = ref('')
 const loading = ref(false)
 const msgContainer = ref<HTMLElement | null>(null)
 
-const panelWidth = ref(450)
-const panelHeight = ref(650)
+// 【核心修复】移动端适配
+const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+const panelWidth = ref(isMobile ? window.innerWidth : 450)
+const panelHeight = ref(isMobile ? window.innerHeight : 650)
 
-// ===== 拖拽逻辑 (保持不变) =====
+const panelStyle = computed(() => {
+  if (isMobile) {
+    return { width: '100vw', height: '100vh', right: '0', bottom: '0', borderRadius: '0', border: 'none' }
+  }
+  return { width: panelWidth.value + 'px', height: panelHeight.value + 'px' }
+})
+
+// ===== 拖拽逻辑 =====
 let isResizing = false, startX = 0, startY = 0, startWidth = 0, startHeight = 0
 function startResize(e: MouseEvent) {
   isResizing = true; startX = e.clientX; startY = e.clientY
@@ -91,26 +100,20 @@ function scrollToBottom() {
   nextTick(() => { if (msgContainer.value) msgContainer.value.scrollTop = msgContainer.value.scrollHeight })
 }
 
-// ===== 【新增】暴露给父组件的方法，用于直接注入上下文并触发问答 =====
-defineExpose({
-  triggerQuery(text: string) {
-    doSend(text)
-  }
-})
+defineExpose({ triggerQuery(text: string) { doSend(text) } })
 </script>
 
 <style scoped>
-/* 样式保持不变 */
 .ai-panel { position: fixed; right: 20px; bottom: 20px; background: var(--color-bg-card); border: 1px solid var(--color-border); border-radius: 12px; box-shadow: var(--shadow-card-hover); display: flex; flex-direction: column; z-index: 1000; resize: none; }
 .resize-handle-top-left { position: absolute; top: 0; left: 0; width: 24px; height: 24px; cursor: nwse-resize; z-index: 10; }
 .resize-handle-top-left::before { content: ''; position: absolute; top: 6px; left: 6px; width: 0; height: 0; border-top: 4px solid var(--color-border); border-left: 4px solid var(--color-border); }
 .ai-header { padding: 12px 16px; border-bottom: 1px solid var(--color-border-light); display: flex; justify-content: space-between; font-weight: bold; flex-shrink: 0; }
-.ai-header button { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--color-text-secondary); }
+.ai-header button { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--color-text-secondary); }
 .ai-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
 .msg { padding: 10px 14px; border-radius: 8px; max-width: 95%; line-height: 1.5; }
 .msg.assistant { background: var(--color-sample-bg); align-self: flex-start; width: 100%; }
 .msg.user { background: var(--color-primary); color: white; align-self: flex-end; }
-.ai-input { padding: 12px; border-top: 1px solid var(--color-border-light); display: flex; gap: 8px; flex-shrink: 0; }
+.ai-input { padding: 12px; border-top: 1px solid var(--color-border-light); display: flex; gap: 8px; flex-shrink: 0; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
 .ai-input textarea { flex: 1; resize: none; height: 40px; border: 1px solid var(--color-border); border-radius: 6px; padding: 10px; background: var(--color-bg-page); color: var(--color-text-primary); font-family: inherit; }
 .ai-input button { padding: 0 16px; background: var(--color-primary); color: white; border: none; border-radius: 6px; cursor: pointer; }
 </style>

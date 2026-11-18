@@ -6,7 +6,6 @@
         <p class="page-desc">配置应用连接与网络</p>
       </header>
 
-      <!-- ===== 后端连接 ===== -->
       <section class="card">
         <div class="card-header"><span>后端连接地址</span></div>
         <div class="card-body">
@@ -26,7 +25,20 @@
         </div>
       </section>
 
-      <!-- ===== 数据备份与恢复 ===== -->
+      <section class="card" style="margin-top: var(--spacing-lg);">
+        <div class="card-header"><span>管理员密钥配置</span></div>
+        <div class="card-body">
+          <p class="hint">部分操作（如备份、修改插件）需要管理员密钥，默认：admin-key-change-me</p>
+          <div class="form-item">
+            <label>Admin Key</label>
+            <input v-model="adminKeyInput" type="password" placeholder="默认 admin-key-change-me" />
+          </div>
+          <div class="actions">
+            <button class="btn-primary" @click="saveAdminKey">保存密钥</button>
+          </div>
+        </div>
+      </section>
+
       <section class="card" style="margin-top: var(--spacing-lg);">
         <div class="card-header"><span>数据备份与恢复</span></div>
         <div class="card-body">
@@ -39,7 +51,6 @@
         </div>
       </section>
 
-      <!-- ===== 已安装插件 ===== -->
       <section class="card" style="margin-top: var(--spacing-lg);">
         <div class="card-header"><span>已安装的扩展插件</span></div>
         <div class="card-body">
@@ -63,7 +74,6 @@
         </div>
       </section>
 
-      <!-- ===== 插件市场 ===== -->
       <section class="card" style="margin-top: var(--spacing-lg);">
         <div class="card-header"><span>插件市场</span></div>
         <div class="card-body">
@@ -87,7 +97,6 @@
         </div>
       </section>
 
-      <!-- ===== AI 模型配置 ===== -->
       <section class="card" style="margin-top: var(--spacing-lg);">
         <div class="card-header"><span>AI 模型配置 (Profile 管理)</span></div>
         <div class="card-body">
@@ -113,7 +122,6 @@
       </section>
     </div>
 
-    <!-- ===== 安装/重启 全屏遮罩 ===== -->
     <div v-if="installing || restarting" class="restart-overlay">
       <div class="spinner"></div>
       <div class="restart-text">{{ overlayText }}</div>
@@ -123,17 +131,14 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
 import { getBackendUrl, setBackendUrl, isTauriEnv } from '../utils/backend-url'
 import { usePluginStore } from '../stores/plugin'
 import api from '../utils/axios'
-// 【修复】引入 AI 相关的 API 方法
 import { getAIConfig, saveAIConfig } from '../api/ai'
 
 const pluginStore = usePluginStore()
 const isTauri = isTauriEnv()
 
-// ===== 插件市场图标辅助 =====
 function getIconLetter(displayName: string) { return displayName ? displayName.charAt(0).toUpperCase() : 'P' }
 function getIconColor(name: string) {
   const colors = ['#0066cc', '#34a853', '#ea4335', '#fbbc05', '#8e44ad']
@@ -141,18 +146,34 @@ function getIconColor(name: string) {
   return colors[Math.abs(hash) % colors.length]
 }
 
-// ===== 判断插件是否已安装 =====
 function isInstalled(pluginName: string) { return pluginStore.plugins.some(p => p.name === pluginName) }
 
-// ===== 数据备份与恢复 =====
+// ===== Admin Key 管理 =====
+const adminKeyInput = ref(localStorage.getItem('admin_key') || 'admin-key-change-me')
+
+function saveAdminKey() {
+  localStorage.setItem('admin_key', adminKeyInput.value)
+  alert('管理员密钥已保存！')
+}
+
+function getAdminKey() {
+  let key = localStorage.getItem('admin_key') || ''
+  if (!key) {
+    key = prompt('请输入管理员密钥 (默认: admin-key-change-me)', 'admin-key-change-me') || ''
+    if (key) localStorage.setItem('admin_key', key)
+  }
+  return key
+}
+
 const backingUp = ref(false)
 const restoring = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 
 async function onBackup() {
+  const adminKey = getAdminKey()
+  if (!adminKey) return
   backingUp.value = true
   try {
-    const adminKey = localStorage.getItem('admin_key') || ''
     const res = await api.get('/admin/backup/export', { headers: { 'X-Admin-Key': adminKey }, responseType: 'blob' })
     const url = URL.createObjectURL(res.data)
     const a = document.createElement('a'); a.href = url; a.download = `oj_backup_${Date.now()}.zip`
@@ -160,7 +181,10 @@ async function onBackup() {
   } catch (e: any) { alert('导出失败：' + (e.response?.data?.detail || e.message)) } finally { backingUp.value = false }
 }
 
-function onRestoreClick() { if (confirm('警告：恢复数据会覆盖当前所有的题库、账号和提交记录！\n\n确定要继续吗？')) fileInputRef.value?.click() }
+function onRestoreClick() {
+  if (!getAdminKey()) return
+  if (confirm('警告：恢复数据会覆盖当前所有的题库、账号和提交记录！\n\n确定要继续吗？')) fileInputRef.value?.click()
+}
 
 async function onRestoreFileChange(e: Event) {
   const input = e.target as HTMLInputElement
@@ -169,13 +193,12 @@ async function onRestoreFileChange(e: Event) {
   restoring.value = true
   const formData = new FormData(); formData.append('file', file)
   try {
-    const adminKey = localStorage.getItem('admin_key') || ''
+    const adminKey = getAdminKey()
     await api.post('/admin/backup/import', formData, { headers: { 'X-Admin-Key': adminKey, 'Content-Type': 'multipart/form-data' } })
     alert('恢复成功！建议重启软件以确保数据完全同步。'); window.location.reload()
   } catch (e: any) { alert('恢复失败：' + (e.response?.data?.detail || e.message)) } finally { restoring.value = false; input.value = '' }
 }
 
-// ===== 网络配置 =====
 const currentUrl = ref('')
 const inputUrl = ref('')
 const lanIp = ref('')
@@ -184,7 +207,13 @@ const testResult = ref('')
 const testSuccess = ref(false)
 
 function loadConfig() { currentUrl.value = getBackendUrl(); inputUrl.value = currentUrl.value }
-function saveConfig() { setBackendUrl(inputUrl.value); currentUrl.value = getBackendUrl(); alert('保存成功！'); window.location.href = '/' }
+function saveConfig() {
+  setBackendUrl(inputUrl.value);
+  currentUrl.value = getBackendUrl();
+  alert('保存成功！页面将刷新应用新配置。');
+  window.location.href = '/#/';
+  window.location.reload();
+}
 function resetConfig() { setBackendUrl(''); loadConfig() }
 
 async function testConnection() {
@@ -203,16 +232,21 @@ async function testConnection() {
   } catch (e: any) { testSuccess.value = false; testResult.value = `连接失败：${e.message || e}` } finally { testing.value = false }
 }
 
-// ===== 插件市场 =====
 const marketLoading = ref(true)
 const marketPlugins = ref<any[]>([])
 
 async function fetchMarket() {
   marketLoading.value = true
-  try { const res = await api.get('/market/plugins'); marketPlugins.value = res.data } catch (e) { console.error(e) } finally { marketLoading.value = false }
+  try {
+    const res = await api.get('/market/plugins');
+    marketPlugins.value = Array.isArray(res.data) ? res.data : []
+  } catch (e) {
+    marketPlugins.value = []
+  } finally {
+    marketLoading.value = false
+  }
 }
 
-// ===== 插件安装 =====
 const installing = ref(false)
 const installingPluginName = ref('')
 const installStatus = ref('')
@@ -234,14 +268,13 @@ const overlayText = computed(() => {
 async function onInstallPlugin(plugin: any) {
   if (!plugin.download_url) return
   if (!confirm(`确定要安装 ${plugin.display_name} 吗？`)) return
+  const adminKey = getAdminKey()
+  if (!adminKey) return
+  
   installing.value = true; installingPluginName.value = plugin.name; installStatus.value = 'starting'
   try {
-    const adminKey = localStorage.getItem('admin_key') || ''
-    await api.post('/admin/market/install', 
-      { 
-        download_url: plugin.download_url,
-        plugin_name: plugin.name // 【修复】把真实名字传给后端
-      }, 
+    await api.post('/admin/market/install',
+      { download_url: plugin.download_url, plugin_name: plugin.name },
       { headers: { 'X-Admin-Key': adminKey } }
     )
     let retries = 300
@@ -258,17 +291,25 @@ async function onInstallPlugin(plugin: any) {
 }
 
 function triggerRestart() {
-  if (isTauri) { restarting.value = true; invoke('restart_backend_cmd').finally(() => { restarting.value = false; window.location.reload() }) }
-  else { alert('插件安装成功！请手动重启后端服务后刷新页面。'); window.location.reload() }
+  if (isTauri) {
+    restarting.value = true;
+    import('@tauri-apps/api/core')
+      .then(({ invoke }) => invoke('restart_backend_cmd'))
+      .finally(() => { restarting.value = false; window.location.reload() })
+  } else {
+    alert('插件安装成功！请手动重启后端服务后刷新页面。');
+    window.location.reload()
+  }
 }
 
-// ===== 插件启停/卸载 =====
 const togglingNav = ref(false); const toggling = ref(false); const uninstalling = ref(false)
 
 async function onToggleNav(p: any) {
+  const adminKey = getAdminKey()
+  if (!adminKey) return
+
   togglingNav.value = true
   try {
-    const adminKey = localStorage.getItem('admin_key') || ''
     const newShow = p.show_in_nav === false ? true : false
     const currentConfig = { ...(p.config || {}), show_in_nav: newShow }
     await api.put(`/admin/plugins/${p.name}/config`, { config: currentConfig }, { headers: { 'X-Admin-Key': adminKey } })
@@ -278,9 +319,11 @@ async function onToggleNav(p: any) {
 
 async function onTogglePlugin(p: any) {
   if (!confirm(`确定要${p.enabled ? '禁用' : '启用'} ${p.display_name} 吗？`)) return
+  const adminKey = getAdminKey()
+  if (!adminKey) return
+  
   toggling.value = true
   try {
-    const adminKey = localStorage.getItem('admin_key') || ''
     const action = p.enabled ? 'disable' : 'enable'
     await api.put(`/admin/plugins/${p.name}/${action}`, {}, { headers: { 'X-Admin-Key': adminKey } })
     alert(`已${p.enabled ? '禁用' : '启用'}。需重启后端生效。`); triggerRestart()
@@ -290,19 +333,19 @@ async function onTogglePlugin(p: any) {
 async function onUninstallPlugin(p: any) {
   const folderName = p.folder_name || p.name
   if (!confirm(`确定要卸载 ${p.display_name || p.name} 吗？\n\n这会销毁插件的微服务容器。`)) return
+  const adminKey = getAdminKey()
+  if (!adminKey) return
+  
   uninstalling.value = true
   try {
-    const adminKey = localStorage.getItem('admin_key') || ''
     await api.delete(`/admin/market/uninstall/${folderName}`, { headers: { 'X-Admin-Key': adminKey } })
     alert('插件已卸载，页面将刷新。'); window.location.reload()
   } catch (e: any) { alert('卸载失败：' + (e.response?.data?.detail || e.message)) } finally { uninstalling.value = false }
 }
 
-// ===== AI 模型配置 =====
 const aiProfiles = ref<Record<string, any>>({})
 const currentProfile = ref<string>('')
 const aiConfig = ref({ api_key: '', base_url: '', model: '', system_prompt: '' })
-const aiLoading = ref(true)
 
 function onProfileChange() {
   if (currentProfile.value && aiProfiles.value[currentProfile.value]) {
@@ -315,7 +358,7 @@ function createNewProfile() {
   if (!name || !name.trim()) return
   const n = name.trim()
   if (aiProfiles.value[n]) { alert('该配置名称已存在！'); return }
-  
+
   aiProfiles.value[n] = { api_key: '', base_url: 'https://api.deepseek.com', model: 'deepseek-chat', system_prompt: '你是一个专业的编程与数学助教。' }
   currentProfile.value = n
   onProfileChange()
@@ -334,46 +377,48 @@ async function onSaveAIConfig() {
   if (!currentProfile.value) return
   aiProfiles.value[currentProfile.value] = { ...aiConfig.value }
   try {
-    await saveAIConfig({
-      profiles: aiProfiles.value,
-      current_profile: currentProfile.value
-    })
+    await saveAIConfig({ profiles: aiProfiles.value, current_profile: currentProfile.value })
     alert('AI 配置已保存至云端账号！换设备登录也不会丢失。')
-  } catch (e: any) {
-    alert('保存失败：' + (e.response?.data?.detail || e.message))
-  }
+  } catch (e: any) { alert('保存失败：' + (e.response?.data?.detail || e.message)) }
 }
 
-// 初始化加载
 onMounted(async () => {
   loadConfig()
-  await pluginStore.fetchPlugins()
-  
-  try {
-    const savedConfig = await getAIConfig()
-    if (savedConfig && savedConfig.profiles) {
-      aiProfiles.value = savedConfig.profiles
-      currentProfile.value = savedConfig.current_profile || Object.keys(aiProfiles.value)[0] || ''
-    } else {
-      // 如果没有配置，给个默认的
-      aiProfiles.value = {
-        'DeepSeek 默认': { api_key: '', base_url: 'https://api.deepseek.com', model: 'deepseek-chat', system_prompt: '你是一个专业的编程与数学助教。' }
+
+  try { await pluginStore.fetchPlugins() } catch (e) { console.warn('加载插件失败', e) }
+
+  const token = localStorage.getItem('oj_token')
+  if (token) {
+    try {
+      const savedConfig = await getAIConfig()
+      if (savedConfig && savedConfig.profiles) {
+        aiProfiles.value = savedConfig.profiles
+        currentProfile.value = savedConfig.current_profile || Object.keys(aiProfiles.value)[0] || ''
+      } else {
+        aiProfiles.value = { '默认配置': { api_key: '', base_url: 'https://api.deepseek.com', model: 'deepseek-chat', system_prompt: '你是一个专业的编程与数学助教。' } }
+        currentProfile.value = '默认配置'
       }
-      currentProfile.value = 'DeepSeek 默认'
-    }
+      onProfileChange()
+    } catch (e) { console.warn('获取 AI 配置失败', e) }
+  } else {
+    aiProfiles.value = { '默认配置': { api_key: '', base_url: 'https://api.deepseek.com', model: 'deepseek-chat', system_prompt: '你是一个专业的编程与数学助教。' } }
+    currentProfile.value = '默认配置'
     onProfileChange()
-  } catch (e) {
-    console.warn('获取 AI 配置失败', e)
-  } finally {
-    aiLoading.value = false
   }
 
-  fetchMarket()
-  if (isTauri) { try { lanIp.value = await invoke<string>('get_lan_ip') } catch (e) { console.warn(e) } }
+  try { fetchMarket() } catch (e) { console.warn(e) }
+
+  if (isTauri) {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core')
+      lanIp.value = await invoke<string>('get_lan_ip')
+    } catch (e) { console.warn(e) }
+  }
 })
 </script>
 
 <style scoped>
+/* 略：原有的样式不用动，直接在最底部追加移动端样式即可 */
 .settings-page { padding: var(--spacing-xl) 0; min-height: calc(100vh - 56px); }
 .container { max-width: 800px; margin: 0 auto; padding: 0 var(--spacing-lg); }
 .page-header { margin-bottom: var(--spacing-lg); }
@@ -389,7 +434,7 @@ onMounted(async () => {
 .form-item label { font-size: 13px; color: var(--color-text-secondary); }
 .form-item input, .form-item textarea { padding: 10px 12px; border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: var(--font-size-body); background: var(--color-bg-card); color: var(--color-text-primary); outline: none; width: 100%; box-sizing: border-box; }
 .filter-select { padding: 10px 12px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-card); color: var(--color-text-primary); font-size: 14px; outline: none; }
-.actions { display: flex; gap: var(--spacing-sm); }
+.actions { display: flex; gap: var(--spacing-sm); flex-wrap: wrap; }
 .btn-primary, .btn-ghost { padding: 10px 20px; border-radius: var(--radius-md); font-size: var(--font-size-body); font-weight: 500; cursor: pointer; }
 .btn-primary { background: var(--color-primary); color: white; border: none; }
 .btn-primary:hover:not(:disabled) { background: var(--color-primary-hover); }
@@ -429,4 +474,17 @@ onMounted(async () => {
 @keyframes spin { to { transform: rotate(360deg); } }
 [data-theme="dark"] .restart-overlay { background: rgba(0, 0, 0, 0.85); }
 [data-theme="dark"] .market-card { background: var(--color-bg-card); }
+@media (max-width: 600px) {
+  .settings-page { padding: var(--spacing-lg) 0; }
+  .container { padding: 0 var(--spacing-md); }
+  .card-body { padding: var(--spacing-md); }
+  .card-header { padding: var(--spacing-md); }
+  .actions { gap: var(--spacing-xs); }
+  .actions .btn-primary,
+  .actions .btn-ghost { flex: 1 1 auto; padding: 10px 12px; font-size: 13px; }
+  .plugin-item { flex-direction: column; align-items: flex-start; }
+  .plugin-actions { margin-left: 0; margin-top: 8px; width: 100%; justify-content: flex-end; flex-wrap: wrap; }
+  .market-grid { grid-template-columns: 1fr; }
+  .market-card { padding: var(--spacing-md); }
+}
 </style>
