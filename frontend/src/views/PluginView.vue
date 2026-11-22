@@ -8,7 +8,6 @@
       </div>
 
       <div class="iframe-container">
-        <!-- 加载遮罩 -->
         <div v-if="loading" class="loading-mask">
           <div class="spinner"></div>
           <div>正在加载插件页面...</div>
@@ -46,7 +45,6 @@ const pluginStore = usePluginStore()
 const loading = ref(true)
 const iframeRef = ref<HTMLIFrameElement | null>(null)
 
-// 【缓存修复】每次进入插件页使用一次性的时间戳，避免 iframe 命中旧磁盘缓存
 const cacheBuster = ref(Date.now())
 
 const pluginName = computed(() => route.params.name as string)
@@ -61,10 +59,6 @@ const iframeUrl = computed(() => {
   return `${base || ''}/plugins_static/${name}/frontend/index.html?v=${cacheBuster.value}`
 })
 
-/**
- * 新窗口打开时无法使用 postMessage，改为把上下文放进 URL。
- * 注意：Token 会出现在该窗口地址栏中，仅建议在本地/可信环境使用。
- */
 const newWindowUrl = computed(() => {
   const url = new URL(iframeUrl.value || '/', window.location.href)
   const token = localStorage.getItem('oj_token')
@@ -103,10 +97,19 @@ function postTheme() {
   }, '*')
 }
 
+/* 【修复】iframe 加载后连续推送上下文，覆盖子页面尚未挂载监听器的窗口期 */
+let contextTimers: number[] = []
+
+function scheduleContextPushes() {
+  contextTimers.forEach(t => window.clearTimeout(t))
+  contextTimers = [0, 120, 400, 900, 1600, 2500].map(delay =>
+    window.setTimeout(postContext, delay)
+  )
+}
+
 function onIframeLoad() {
   loading.value = false
-  // 插件页面即使不发 ready，也主动推一次上下文
-  postContext()
+  scheduleContextPushes()
 }
 
 function onIframeMessage(event: MessageEvent) {
@@ -149,11 +152,12 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('message', onIframeMessage)
+  contextTimers.forEach(t => window.clearTimeout(t))
+  contextTimers = []
   themeObserver?.disconnect()
   themeObserver = null
 })
 
-// 路由参数变化时，重置加载状态并刷新缓存参数
 watch(() => route.params.name, () => {
   loading.value = true
   cacheBuster.value = Date.now()
@@ -224,7 +228,6 @@ watch(() => route.params.name, () => {
   color: var(--color-text-muted);
 }
 
-/* 加载遮罩 */
 .loading-mask {
   position: absolute;
   inset: 0;

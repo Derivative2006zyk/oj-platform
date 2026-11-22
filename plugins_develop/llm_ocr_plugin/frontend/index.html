@@ -121,7 +121,6 @@
 
     .app { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
 
-    /* ===== 顶部栏 ===== */
     .topbar {
       position: sticky;
       top: 0;
@@ -180,7 +179,6 @@
     .conn-chip.checking i { background: #f59e0b; animation: pulse 1s infinite; }
     @keyframes pulse { 50% { opacity: 0.35; } }
 
-    /* ===== 主体 ===== */
     .main { flex: 1; width: 100%; max-width: 900px; margin: 0 auto; padding: 14px 14px 120px; }
 
     .card {
@@ -203,7 +201,6 @@
       font-size: 12px; font-weight: 700;
     }
 
-    /* ===== 上传区 ===== */
     .dropzone {
       position: relative;
       padding: 22px 14px;
@@ -251,7 +248,6 @@
       font-size: 12px; color: var(--text-2);
     }
 
-    /* ===== 表单 ===== */
     .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
     .field:last-child { margin-bottom: 0; }
     .field-label { font-size: 12px; font-weight: 600; color: var(--text-2); }
@@ -302,7 +298,6 @@
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     }
 
-    /* ===== 按钮 ===== */
     .btn {
       display: inline-flex; align-items: center; justify-content: center; gap: 6px;
       min-height: 44px; padding: 0 18px;
@@ -324,7 +319,6 @@
 
     #parseBtn { width: 100%; margin: 4px 0 14px; }
 
-    /* ===== 识别进度 ===== */
     .progress-card { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
     .spinner {
       width: 22px; height: 22px; flex-shrink: 0;
@@ -339,7 +333,6 @@
     .progress-text p { margin: 2px 0 0; font-size: 12px; color: var(--text-2); }
     .progress-time { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 
-    /* ===== 识别结果 ===== */
     .results-head {
       display: flex; align-items: flex-end; justify-content: space-between; gap: 12px;
       margin: 18px 2px 10px;
@@ -424,7 +417,6 @@
     }
     #parseAgainBtn { margin-top: 14px; }
 
-    /* ===== 提示 ===== */
     .notice {
       display: flex; align-items: flex-start; gap: 12px;
       margin-bottom: 12px;
@@ -450,7 +442,6 @@
     .gate h2 { margin: 0 0 6px; font-size: 17px; }
     .gate p { max-width: 320px; margin: 0 auto 18px; color: var(--text-2); font-size: 13px; }
 
-    /* ===== 吸底导入栏 ===== */
     .action-bar {
       position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
       padding: 10px 14px;
@@ -467,7 +458,6 @@
     .action-sub { display: block; margin-top: 1px; font-size: 11px; color: var(--muted); }
     #importBtn { min-width: 132px; }
 
-    /* ===== 抽屉 ===== */
     .drawer-mask {
       position: fixed; inset: 0; z-index: 60;
       display: flex; align-items: flex-end; justify-content: center;
@@ -487,7 +477,6 @@
     .drawer .field { margin: 14px 0 18px; }
     .drawer-actions { display: flex; justify-content: flex-end; gap: 10px; }
 
-    /* ===== Toast ===== */
     .toast {
       position: fixed;
       left: 50%;
@@ -732,7 +721,8 @@
         parsing: false,
         importing: false,
         abort: null,
-        contextReceived: false
+        contextReceived: false,
+        contextAttempts: 0
       };
 
       var el = {
@@ -783,7 +773,6 @@
         toast: $('#toast')
       };
 
-      /* ================= 主题 ================= */
       function applyTheme(theme) {
         var value = theme;
         if (value !== 'dark' && value !== 'light') {
@@ -793,7 +782,6 @@
         document.documentElement.setAttribute('data-theme', value);
       }
 
-      /* ================= 上下文 ================= */
       function normalizeBase(value) {
         if (!value) return '';
         var base = String(value).trim().replace(/\/+$/, '');
@@ -813,18 +801,18 @@
         applyTheme(params.get('theme') || store.get('oj_theme') || '');
       }
 
+      /* 【修复】握手改为长窗口重试：最多 40 次，间隔 500ms，覆盖 Tauri 冷启动 */
       function requestContext() {
         if (window.parent === window) return;
-        var attempts = 0;
 
         function send() {
           if (state.contextReceived) return;
           try {
             window.parent.postMessage({ type: 'oj:plugin-ready' }, '*');
           } catch (e) {}
-          attempts += 1;
-          if (attempts < 6 && !state.contextReceived) {
-            window.setTimeout(send, 700);
+          state.contextAttempts += 1;
+          if (state.contextAttempts < 40 && !state.contextReceived) {
+            window.setTimeout(send, 500);
           }
         }
 
@@ -854,7 +842,6 @@
         else if (data.type === 'oj:theme' && typeof data.theme === 'string') applyTheme(data.theme);
       });
 
-      /* ================= 鉴权与初始化 ================= */
       function refreshAuthUI() {
         var loggedIn = !!state.token;
         el.authGate.hidden = loggedIn;
@@ -872,7 +859,6 @@
         loadBanks();
       }
 
-      /* ================= 网络 ================= */
       function apiUrl(path) { return (state.apiBase || '') + '/api' + path; }
 
       function authHeaders(extra) {
@@ -890,9 +876,9 @@
       function checkHealth() {
         setConnChip('checking', '检测中');
         var controller = new AbortController();
-        var timer = window.setTimeout(function () { controller.abort(); }, 5000);
+        var timer = window.setTimeout(function () { controller.abort(); }, 8000);
 
-        fetch(apiUrl('/banks'), { cache: 'no-store', signal: controller.signal })
+        fetch(apiUrl('/banks'), { cache: 'no-store', headers: authHeaders(), signal: controller.signal })
           .then(function (res) {
             setConnChip(res.ok ? 'ok' : 'bad', res.ok ? '已连接' : '连接异常');
           })
@@ -906,7 +892,14 @@
         if (!state.token) return;
 
         fetch(apiUrl('/plugins/ai/config'), { headers: authHeaders() })
-          .then(function (res) { return res.ok ? res.json() : null; })
+          .then(function (res) {
+            if (res.status === 401) {
+              state.token = '';
+              refreshAuthUI();
+              return null;
+            }
+            return res.ok ? res.json() : null;
+          })
           .then(function (data) {
             if (!data) return;
             var config = data.config || {};
@@ -914,10 +907,15 @@
             var active = profiles[config.current_profile] || {};
             var model = String(active.model || '').trim();
             var hasKey = String(active.api_key || '').trim();
+            var baseUrl = String(active.base_url || '').trim();
 
-            if (model || hasKey) {
-              el.modelStatus.textContent = '模型：' + (model || '已配置');
+            if (model && baseUrl) {
+              el.modelStatus.textContent = '模型：' + model;
               el.modelStatus.classList.remove('warn');
+            } else if (hasKey && !baseUrl) {
+              el.modelStatus.textContent = '当前配置缺少 Base URL，点此设置';
+              el.modelStatus.classList.add('warn');
+              showConfigNotice('当前选中的 AI 配置缺少 Base URL，请在设置中补全。');
             } else {
               el.modelStatus.textContent = '未配置 AI 模型，点此设置';
               el.modelStatus.classList.add('warn');
@@ -996,7 +994,6 @@
         });
       }
 
-      /* ================= 图片处理 ================= */
       function formatSize(bytes) {
         if (bytes < 1024) return bytes + ' B';
         if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + ' KB';
@@ -1093,7 +1090,6 @@
         el.parseBtn.textContent = '开始识别';
       }
 
-      /* ================= 识别 ================= */
       function parseImage() {
         if (!state.file || state.parsing) return;
         if (!state.token) { refreshAuthUI(); return; }
@@ -1178,7 +1174,6 @@
           });
       }
 
-      /* ================= 结果渲染 ================= */
       function normalizeDescription(text) {
         return String(text || '')
           .replace(/\r\n/g, '\n')
@@ -1206,4 +1201,473 @@
 
       function fillPreview(node, text) {
         if (!text) {
-          node.innerHTML
+          node.innerHTML = '<span class="placeholder">暂无内容</span>';
+          return;
+        }
+        node.innerHTML = escapeHtml(text).replace(/\n/g, '<br>');
+        typeset(node);
+      }
+
+      function updateStat(node, text) {
+        var dollars = (text.match(/\$/g) || []).length;
+        var label = text.length + ' 字';
+
+        if (dollars > 0) label += ' · ' + Math.floor(dollars / 2) + ' 个公式';
+        node.classList.toggle('warn', dollars % 2 === 1);
+        if (dollars % 2 === 1) label += ' · 公式符未配对';
+
+        node.textContent = label;
+      }
+
+      function autoGrow(textarea) {
+        textarea.style.height = 'auto';
+        textarea.style.height = Math.min(textarea.scrollHeight, 420) + 'px';
+      }
+
+      function buildCard(item, index) {
+        var card = document.createElement('article');
+        card.className = 'result-card';
+        card.dataset.id = item.id;
+
+        card.innerHTML =
+          '<div class="rc-head">' +
+            '<label class="rc-check" title="选择此题">' +
+              '<input type="checkbox" aria-label="选择此题">' +
+              '<span></span>' +
+            '</label>' +
+            '<input class="rc-title" type="text" maxlength="200" aria-label="题目标题">' +
+            '<button type="button" class="icon-btn rc-del" title="删除此题" aria-label="删除此题">×</button>' +
+          '</div>' +
+          '<div class="rc-body">' +
+            '<div class="rc-preview"></div>' +
+            '<textarea class="rc-text" rows="4" spellcheck="false" aria-label="题目内容"></textarea>' +
+          '</div>' +
+          '<div class="rc-foot">' +
+            '<span class="rc-index">' + (index + 1) + '</span>' +
+            '<span class="rc-stat"></span>' +
+            '<button type="button" class="link-btn rc-toggle">编辑</button>' +
+          '</div>';
+
+        var checkbox = $('input[type="checkbox"]', card);
+        var titleInput = $('.rc-title', card);
+        var textarea = $('.rc-text', card);
+        var preview = $('.rc-preview', card);
+        var stat = $('.rc-stat', card);
+        var toggle = $('.rc-toggle', card);
+
+        checkbox.checked = item.selected;
+        titleInput.value = item.title;
+        textarea.value = item.desc;
+
+        function refreshStat() { updateStat(stat, item.desc); }
+
+        function applyMode() {
+          card.classList.toggle('is-editing', item.editing);
+          preview.hidden = item.editing;
+          textarea.hidden = !item.editing;
+          toggle.textContent = item.editing ? '预览' : '编辑';
+
+          if (item.editing) {
+            window.requestAnimationFrame(function () {
+              autoGrow(textarea);
+              textarea.focus();
+            });
+          } else {
+            fillPreview(preview, item.desc);
+          }
+        }
+
+        checkbox.addEventListener('change', function () {
+          item.selected = checkbox.checked;
+          updateActionBar();
+        });
+
+        titleInput.addEventListener('input', function () {
+          item.title = titleInput.value;
+        });
+
+        textarea.addEventListener('input', function () {
+          item.desc = textarea.value;
+          refreshStat();
+          autoGrow(textarea);
+        });
+
+        toggle.addEventListener('click', function () {
+          item.editing = !item.editing;
+          applyMode();
+        });
+
+        $('.rc-del', card).addEventListener('click', function () {
+          removeItem(item);
+        });
+
+        refreshStat();
+        card.__applyMode = applyMode;
+        return card;
+      }
+
+      function renderList() {
+        el.resultList.replaceChildren();
+
+        state.items.forEach(function (item, index) {
+          var card = buildCard(item, index);
+          item.el = card;
+          el.resultList.appendChild(card);
+          card.__applyMode();
+        });
+
+        el.resultCount.textContent = String(state.items.length);
+        updateActionBar();
+      }
+
+      function setItems(list) {
+        var now = Date.now();
+
+        state.items = list.map(function (item, index) {
+          return {
+            id: 'item-' + now + '-' + index,
+            title: String(item && item.title ? item.title : '题目 ' + (index + 1)).trim(),
+            desc: normalizeDescription(item && item.description),
+            selected: true,
+            editing: false,
+            el: null
+          };
+        });
+
+        renderList();
+      }
+
+      function removeItem(item) {
+        if (item.el && item.el.parentNode) item.el.parentNode.removeChild(item.el);
+        state.items = state.items.filter(function (entry) { return entry !== item; });
+
+        $$('.result-card', el.resultList).forEach(function (card, index) {
+          var indexNode = $('.rc-index', card);
+          if (indexNode) indexNode.textContent = String(index + 1);
+        });
+
+        el.resultCount.textContent = String(state.items.length);
+
+        if (!state.items.length) {
+          resetForNext();
+        } else {
+          updateActionBar();
+        }
+      }
+
+      function showResults(visible) {
+        el.resultsSection.hidden = !visible;
+        document.body.classList.toggle('has-results', visible);
+        updateActionBar();
+      }
+
+      function resetForNext() {
+        clearImage();
+        state.items = [];
+        el.resultList.replaceChildren();
+        el.resultCount.textContent = '0';
+        showResults(false);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+
+      function updateActionBar() {
+        var selected = state.items.filter(function (item) { return item.selected; }).length;
+        var visible = document.body.classList.contains('has-results');
+        var allSelected = state.items.length > 0 && state.items.every(function (item) { return item.selected; });
+
+        el.selectedCount.textContent = String(selected);
+        el.selectAllBtn.textContent = allSelected ? '取消全选' : '全选';
+        el.importBtn.disabled = selected === 0 || state.importing;
+        el.importBtn.textContent = state.importing ? '导入中…' : '导入题库';
+        el.actionSub.textContent = state.importing
+          ? '正在写入数据库…'
+          : (selected ? '确认无误后导入' : '请至少选择一道题');
+        el.actionBar.hidden = !visible || state.items.length === 0;
+      }
+
+      function toggleSelectAll() {
+        if (!state.items.length) return;
+
+        var selectAll = !state.items.every(function (item) { return item.selected; });
+
+        state.items.forEach(function (item) {
+          item.selected = selectAll;
+          if (item.el) {
+            var checkbox = $('input[type="checkbox"]', item.el);
+            if (checkbox) checkbox.checked = selectAll;
+          }
+        });
+
+        updateActionBar();
+      }
+
+      function importSelected() {
+        if (state.importing) return;
+
+        var selected = state.items.filter(function (item) { return item.selected; });
+        if (!selected.length) {
+          toast('请至少选择一道题', 'error');
+          return;
+        }
+        if (!state.adminKey) {
+          openDrawer('导入题目需要管理员密钥，请填写后重试。');
+          return;
+        }
+
+        state.importing = true;
+        updateActionBar();
+
+        var problems = selected.map(function (item) {
+          return {
+            title: (item.title || '').trim() || '未命名题目',
+            description: toStoredDescription(item.desc),
+            type: state.type,
+            category_id: 1,
+            difficulty: 1,
+            bank_id: state.bankId ? Number(state.bankId) : null,
+            paper_id: state.paperId ? Number(state.paperId) : null,
+            tags: ['AI识别', 'llm_ocr'],
+            test_cases: [],
+            subproblems: []
+          };
+        });
+
+        fetch(apiUrl('/admin/problems/batch'), {
+          method: 'POST',
+          headers: authHeaders({
+            'Content-Type': 'application/json',
+            'X-Admin-Key': state.adminKey
+          }),
+          body: JSON.stringify({ problems: problems })
+        })
+          .then(function (res) {
+            if (!res.ok) {
+              return readError(res).then(function (detail) {
+                if (res.status === 401) {
+                  state.token = '';
+                  refreshAuthUI();
+                  throw new Error('登录状态已失效，请重新登录');
+                }
+                if (res.status === 403) {
+                  openDrawer('管理员密钥不正确，请重新输入。');
+                }
+                throw new Error(detail);
+              });
+            }
+            return res.json();
+          })
+          .then(function (result) {
+            var imported = result && typeof result.imported === 'number'
+              ? result.imported
+              : problems.length;
+
+            toast('已导入 ' + imported + ' 道题目', 'success', 4000);
+            resetForNext();
+          })
+          .catch(function (err) {
+            toast((err && err.message) || '导入失败，请稍后重试', 'error', 6000);
+          })
+          .then(function () {
+            state.importing = false;
+            updateActionBar();
+          });
+      }
+
+      var toastTimer = 0;
+
+      function toast(message, kind, duration) {
+        el.toast.textContent = message;
+        el.toast.className = 'toast show ' + (kind || 'info');
+
+        window.clearTimeout(toastTimer);
+        toastTimer = window.setTimeout(function () {
+          el.toast.className = 'toast';
+        }, duration || 3200);
+      }
+
+      function showConfigNotice(message) {
+        el.configNoticeText.textContent = message ||
+          '请先在「设置 → AI 模型配置」中填写 API Key 与模型名称。';
+        el.configNotice.hidden = false;
+      }
+
+      function hideConfigNotice() { el.configNotice.hidden = true; }
+
+      function openDrawer(message) {
+        el.drawerHint.textContent = message || '导入题目需要管理员密钥。';
+        el.adminKeyInput.value = state.adminKey || '';
+        el.drawerMask.hidden = false;
+        window.setTimeout(function () { el.adminKeyInput.focus(); }, 60);
+      }
+
+      function closeDrawer() { el.drawerMask.hidden = true; }
+
+      function saveAdminKey() {
+        var value = el.adminKeyInput.value.trim();
+        if (!value) {
+          toast('请输入管理员密钥', 'error');
+          return;
+        }
+
+        state.adminKey = value;
+        store.set('admin_key', value);
+
+        if (window.parent !== window) {
+          try {
+            window.parent.postMessage({ type: 'oj:set-admin-key', adminKey: value }, '*');
+          } catch (e) {}
+        }
+
+        closeDrawer();
+        toast('管理员密钥已保存', 'success');
+      }
+
+      function goToParent(path) {
+        if (window.parent !== window) {
+          window.parent.postMessage({ type: 'oj:navigate', path: path }, '*');
+        } else {
+          toast('请回到主应用完成操作', 'info');
+        }
+      }
+
+      el.goLoginBtn.addEventListener('click', function () { goToParent('/login'); });
+      el.goSettingsBtn.addEventListener('click', function () { goToParent('/settings'); });
+      el.modelStatus.addEventListener('click', function () { goToParent('/settings'); });
+
+      el.cameraBtn.addEventListener('click', function (event) {
+        event.stopPropagation();
+        el.cameraInput.click();
+      });
+      el.galleryBtn.addEventListener('click', function (event) {
+        event.stopPropagation();
+        el.galleryInput.click();
+      });
+      el.replaceImgBtn.addEventListener('click', function (event) {
+        event.stopPropagation();
+        el.galleryInput.click();
+      });
+
+      [el.cameraInput, el.galleryInput].forEach(function (input) {
+        input.addEventListener('change', function () {
+          var file = input.files && input.files[0];
+          input.value = '';
+          if (file) selectFile(file);
+        });
+      });
+
+      el.dropzone.addEventListener('click', function (event) {
+        if (event.target.closest('button')) return;
+        if (!el.dzPreview.hidden) return;
+        el.galleryInput.click();
+      });
+
+      ['dragenter', 'dragover'].forEach(function (name) {
+        el.dropzone.addEventListener(name, function (event) {
+          event.preventDefault();
+          el.dropzone.classList.add('dragging');
+        });
+      });
+
+      ['dragleave', 'dragend', 'drop'].forEach(function (name) {
+        el.dropzone.addEventListener(name, function (event) {
+          event.preventDefault();
+          el.dropzone.classList.remove('dragging');
+        });
+      });
+
+      el.dropzone.addEventListener('drop', function (event) {
+        var files = event.dataTransfer && event.dataTransfer.files;
+        if (files && files.length) selectFile(files[0]);
+      });
+
+      window.addEventListener('paste', function (event) {
+        var items = event.clipboardData && event.clipboardData.items;
+        if (!items || !state.token) return;
+
+        for (var i = 0; i < items.length; i += 1) {
+          if (items[i].type && items[i].type.indexOf('image/') === 0) {
+            var file = items[i].getAsFile();
+            if (file) {
+              selectFile(file);
+              toast('已从剪贴板读取图片', 'info');
+              break;
+            }
+          }
+        }
+      });
+
+      el.clearImgBtn.addEventListener('click', function (event) {
+        event.stopPropagation();
+        clearImage();
+      });
+
+      el.typeSeg.addEventListener('click', function (event) {
+        var button = event.target.closest('button[data-type]');
+        if (!button) return;
+
+        state.type = button.dataset.type;
+        $$('button[data-type]', el.typeSeg).forEach(function (candidate) {
+          var active = candidate === button;
+          candidate.classList.toggle('active', active);
+          candidate.setAttribute('aria-checked', String(active));
+        });
+      });
+
+      el.bankSelect.addEventListener('change', function () {
+        state.bankId = el.bankSelect.value;
+        loadPapers(state.bankId);
+      });
+
+      el.paperSelect.addEventListener('change', function () {
+        state.paperId = el.paperSelect.value;
+      });
+
+      el.parseBtn.addEventListener('click', parseImage);
+      el.cancelParseBtn.addEventListener('click', function () {
+        if (state.abort) state.abort.abort();
+      });
+
+      el.selectAllBtn.addEventListener('click', toggleSelectAll);
+      el.clearResultsBtn.addEventListener('click', function () {
+        if (window.confirm('确定清空当前识别结果？')) resetForNext();
+      });
+      el.parseAgainBtn.addEventListener('click', resetForNext);
+      el.importBtn.addEventListener('click', importSelected);
+
+      el.drawerCancel.addEventListener('click', closeDrawer);
+      el.drawerSave.addEventListener('click', saveAdminKey);
+      el.drawerMask.addEventListener('click', function (event) {
+        if (event.target === el.drawerMask) closeDrawer();
+      });
+
+      document.addEventListener('keydown', function (event) {
+        if (event.key !== 'Escape') return;
+        if (!el.drawerMask.hidden) closeDrawer();
+        else if (state.parsing && state.abort) state.abort.abort();
+      });
+
+      window.addEventListener('online', checkHealth);
+
+      (function waitForMathJax(attempt) {
+        if (window.__MATHJAX_FAILED__) return;
+        var mathJax = window.MathJax;
+
+        if (mathJax && mathJax.startup && mathJax.startup.promise) {
+          mathJax.startup.promise.then(function () {
+            $$('.rc-preview').forEach(typeset);
+          }).catch(function () {});
+          return;
+        }
+
+        if (attempt >= 40) return;
+        window.setTimeout(function () { waitForMathJax(attempt + 1); }, 500);
+      })(0);
+
+      readContextFromLocation();
+      refreshAuthUI();
+      if (state.token) bootstrapData();
+      requestContext();
+    })();
+  </script>
+</body>
+</html>
