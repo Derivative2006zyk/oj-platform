@@ -46,15 +46,19 @@ const pluginStore = usePluginStore()
 const loading = ref(true)
 const iframeRef = ref<HTMLIFrameElement | null>(null)
 
+// 【缓存修复】每次进入插件页使用一次性的时间戳，避免 iframe 命中旧磁盘缓存
+const cacheBuster = ref(Date.now())
+
 const pluginName = computed(() => route.params.name as string)
 const pluginInfo = computed(() =>
   pluginStore.plugins.find(p => p.folder_name === pluginName.value)
 )
 
 const iframeUrl = computed(() => {
+  if (!pluginName.value) return ''
   const base = getBackendUrl()
   const name = encodeURIComponent(pluginName.value)
-  return `${base || ''}/plugins_static/${name}/frontend/index.html`
+  return `${base || ''}/plugins_static/${name}/frontend/index.html?v=${cacheBuster.value}`
 })
 
 /**
@@ -62,7 +66,7 @@ const iframeUrl = computed(() => {
  * 注意：Token 会出现在该窗口地址栏中，仅建议在本地/可信环境使用。
  */
 const newWindowUrl = computed(() => {
-  const url = new URL(iframeUrl.value, window.location.href)
+  const url = new URL(iframeUrl.value || '/', window.location.href)
   const token = localStorage.getItem('oj_token')
   const adminKey = localStorage.getItem('admin_key')
   const base = getBackendUrl()
@@ -149,9 +153,10 @@ onUnmounted(() => {
   themeObserver = null
 })
 
-// 路由参数变化时，重置加载状态
+// 路由参数变化时，重置加载状态并刷新缓存参数
 watch(() => route.params.name, () => {
   loading.value = true
+  cacheBuster.value = Date.now()
 })
 </script>
 
