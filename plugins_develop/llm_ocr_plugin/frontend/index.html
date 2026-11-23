@@ -172,14 +172,23 @@
       background: var(--sample);
       color: var(--text-2);
       font-size: 11px; font-weight: 600;
+      transition: color 0.2s ease, border-color 0.2s ease;
     }
     .conn-chip i { display: block; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
+    .conn-chip.ok { color: var(--success); border-color: var(--border-light); }
     .conn-chip.ok i { background: #10b981; }
+    .conn-chip.bad { color: var(--danger); }
     .conn-chip.bad i { background: #ef4444; }
     .conn-chip.checking i { background: #f59e0b; animation: pulse 1s infinite; }
     @keyframes pulse { 50% { opacity: 0.35; } }
 
-    .main { flex: 1; width: 100%; max-width: 900px; margin: 0 auto; padding: 14px 14px 120px; }
+    .main {
+      flex: 1;
+      width: 100%;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 14px 14px calc(120px + var(--keyboard-inset, 0px));
+    }
 
     .card {
       background: var(--card);
@@ -314,6 +323,7 @@
     .btn.primary:disabled { background: var(--primary-disabled); cursor: not-allowed; transform: none; }
     .btn.ghost { background: transparent; border-color: var(--border); color: var(--text-2); }
     .btn.ghost:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+    .btn.ghost:disabled { opacity: 0.5; cursor: not-allowed; }
     .btn.small { min-height: 36px; padding: 0 12px; font-size: 13px; border-radius: 8px; }
     .btn.block { width: 100%; }
 
@@ -429,6 +439,22 @@
     .notice strong { display: block; font-size: 13px; }
     .notice p { margin: 2px 0 0; font-size: 12px; line-height: 1.5; }
     .notice .btn { flex-shrink: 0; align-self: center; }
+    .notice.offline {
+      background: var(--danger-bg);
+      color: var(--danger);
+    }
+
+    .draft-banner {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 12px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      border: 1px dashed var(--primary);
+      background: var(--primary-light);
+      color: var(--primary);
+      font-size: 13px;
+    }
+    .draft-banner span { flex: 1; min-width: 0; }
 
     .gate {
       padding: 40px 20px;
@@ -441,6 +467,12 @@
     .gate-icon { color: var(--primary); margin-bottom: 8px; display: flex; justify-content: center; }
     .gate h2 { margin: 0 0 6px; font-size: 17px; }
     .gate p { max-width: 320px; margin: 0 auto 18px; color: var(--text-2); font-size: 13px; }
+    .gate .gate-actions { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+    .gate.offline .gate-icon { color: var(--danger); }
+    .gate-hint {
+      margin: 14px auto 0; max-width: 320px;
+      font-size: 12px; line-height: 1.6; color: var(--muted);
+    }
 
     .action-bar {
       position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
@@ -456,6 +488,7 @@
     .action-summary { flex: 1; min-width: 0; font-size: 13px; color: var(--text-2); }
     .action-summary strong { margin-right: 2px; font-size: 16px; color: var(--text); }
     .action-sub { display: block; margin-top: 1px; font-size: 11px; color: var(--muted); }
+    .action-sub.warn { color: var(--warning); }
     #importBtn { min-width: 132px; }
 
     .drawer-mask {
@@ -502,13 +535,13 @@
     body.has-results #parseBtn { display: none; }
 
     @media (min-width: 640px) {
-      .main { padding: 20px 24px 120px; }
+      .main { padding: 20px 24px calc(120px + var(--keyboard-inset, 0px)); }
       .drawer-mask { align-items: center; padding: 20px; }
       .drawer { border-radius: 16px; }
     }
 
     @media (max-width: 640px) {
-      .main { padding: 12px 12px 120px; }
+      .main { padding: 12px 12px calc(120px + var(--keyboard-inset, 0px)); }
       .topbar-inner { padding: 8px 12px; }
       .card { padding: 14px; }
       .field-row { grid-template-columns: 1fr; gap: 0; }
@@ -520,6 +553,13 @@
 
     @media (max-width: 480px) {
       .card-note { display: none; }
+    }
+
+    @media (max-height: 500px) and (orientation: landscape) {
+      .main { padding: 8px 12px 96px; }
+      .action-bar { padding: 6px 12px; }
+      .card { padding: 10px; margin-bottom: 8px; }
+      .dz-preview img { max-height: 180px; }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -557,16 +597,50 @@
         </div>
         <h2>需要登录后使用</h2>
         <p>AI 识别会读取你在「设置」里配置的模型，请先回到主应用登录。</p>
-        <button type="button" class="btn primary" id="goLoginBtn">前往登录</button>
+        <div class="gate-actions">
+          <button type="button" class="btn primary" id="goLoginBtn">前往登录</button>
+        </div>
+      </section>
+
+      <section class="gate offline" id="offlineGate" hidden>
+        <div class="gate-icon" aria-hidden="true">
+          <svg width="34" height="34" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 8.5a16 16 0 0 1 20 0"></path>
+            <path d="M5 12.5a11 11 0 0 1 14 0"></path>
+            <path d="M8.5 16.5a6 6 0 0 1 7 0"></path>
+            <path d="M12 20h.01"></path>
+            <path d="M3 3l18 18"></path>
+          </svg>
+        </div>
+        <h2>当前无网络，且没有可用缓存</h2>
+        <p>AI 识别需要连接后端服务。请检查网络或后端地址后重试。</p>
+        <div class="gate-actions">
+          <button type="button" class="btn primary" id="retryConnBtn">重新检测</button>
+          <button type="button" class="btn ghost" id="goSettingsFromOfflineBtn">检查后端地址</button>
+        </div>
+        <p class="gate-hint" id="offlineDetail">后端地址：（读取中）</p>
       </section>
 
       <div id="workspace" hidden>
+        <div class="notice" id="offlineNotice" hidden>
+          <div class="notice-main">
+            <strong>网络已断开</strong>
+            <p>识别与导入已暂停。恢复网络后会自动继续，当前识别结果已保存在本地。</p>
+          </div>
+        </div>
+
         <div class="notice" id="configNotice" hidden>
           <div class="notice-main">
             <strong>还没有可用的 AI 模型</strong>
             <p id="configNoticeText">请先在「设置 → AI 模型配置」中填写 API Key 与模型名称。</p>
           </div>
           <button type="button" class="btn ghost small" id="goSettingsBtn">去设置</button>
+        </div>
+
+        <div class="draft-banner" id="draftBanner" hidden>
+          <span id="draftBannerText">已从本地恢复上次的识别结果</span>
+          <button type="button" class="btn ghost small" id="draftDiscardBtn">丢弃</button>
         </div>
 
         <section class="card" id="uploadCard">
@@ -698,6 +772,8 @@
     (function () {
       'use strict';
 
+      var DRAFT_KEY = 'llm_ocr_draft_v1';
+
       var $ = function (selector, root) { return (root || document).querySelector(selector); };
       var $$ = function (selector, root) {
         return Array.prototype.slice.call((root || document).querySelectorAll(selector));
@@ -705,7 +781,8 @@
 
       var store = {
         get: function (key) { try { return localStorage.getItem(key) || ''; } catch (e) { return ''; } },
-        set: function (key, value) { try { localStorage.setItem(key, value); } catch (e) {} }
+        set: function (key, value) { try { localStorage.setItem(key, value); } catch (e) {} },
+        remove: function (key) { try { localStorage.removeItem(key); } catch (e) {} }
       };
 
       var state = {
@@ -722,18 +799,29 @@
         importing: false,
         abort: null,
         contextReceived: false,
-        contextAttempts: 0
+        contextAttempts: 0,
+        offline: false,
+        checking: false,
+        pendingRetry: null
       };
 
       var el = {
         workspace: $('#workspace'),
         authGate: $('#authGate'),
+        offlineGate: $('#offlineGate'),
+        offlineDetail: $('#offlineDetail'),
+        retryConnBtn: $('#retryConnBtn'),
+        goSettingsFromOfflineBtn: $('#goSettingsFromOfflineBtn'),
         goLoginBtn: $('#goLoginBtn'),
         connChip: $('#connChip'),
         modelStatus: $('#modelStatus'),
+        offlineNotice: $('#offlineNotice'),
         configNotice: $('#configNotice'),
         configNoticeText: $('#configNoticeText'),
         goSettingsBtn: $('#goSettingsBtn'),
+        draftBanner: $('#draftBanner'),
+        draftBannerText: $('#draftBannerText'),
+        draftDiscardBtn: $('#draftDiscardBtn'),
         uploadCard: $('#uploadCard'),
         dropzone: $('#dropzone'),
         cameraInput: $('#cameraInput'),
@@ -801,7 +889,6 @@
         applyTheme(params.get('theme') || store.get('oj_theme') || '');
       }
 
-      /* 【修复】握手改为长窗口重试：最多 40 次，间隔 500ms，覆盖 Tauri 冷启动 */
       function requestContext() {
         if (window.parent === window) return;
 
@@ -844,27 +931,102 @@
 
       function refreshAuthUI() {
         var loggedIn = !!state.token;
-        el.authGate.hidden = loggedIn;
-        el.workspace.hidden = !loggedIn;
+        el.authGate.hidden = loggedIn || !state.offline;
         if (!loggedIn) {
+          el.offlineGate.hidden = true;
+          el.workspace.hidden = true;
           el.modelStatus.textContent = '登录后可读取模型配置';
           el.modelStatus.classList.remove('warn');
+          return;
         }
+        el.offlineGate.hidden = !state.offline;
+        el.workspace.hidden = false;
+        el.offlineNotice.hidden = !state.offline;
+        updateOfflineDetail();
+      }
+
+      function updateOfflineDetail() {
+        var base = state.apiBase || '相对路径（当前站点）';
+        el.offlineDetail.textContent = '后端地址：' + base;
+      }
+
+      /* ================= 连通性 ================= */
+      function probeConnection(timeoutMs) {
+        if (state.checking) return Promise.resolve(!state.offline);
+        state.checking = true;
+        setConnChip('checking', '检测中');
+
+        var controller = new AbortController();
+        var timer = window.setTimeout(function () { controller.abort(); }, timeoutMs || 8000);
+
+        return fetch(apiUrl('/banks'), {
+          cache: 'no-store',
+          headers: authHeaders(),
+          signal: controller.signal
+        })
+          .then(function (res) {
+            var ok = res.ok || res.status === 401 || res.status === 403;
+            endProbe();
+            return ok;
+          })
+          .catch(function () {
+            endProbe();
+            return false;
+          });
+
+        function endProbe() {
+          window.clearTimeout(timer);
+          state.checking = false;
+        }
+      }
+
+      function setOffline(isOffline) {
+        var changed = state.offline !== isOffline;
+        state.offline = isOffline;
+        updateOfflineDetail();
+        refreshAuthUI();
+        updateActionBar();
+
+        if (changed && isOffline) {
+          toast('网络已断开，识别结果已保存在本地', 'error', 4000);
+        }
+        if (changed && !isOffline) {
+          toast('网络已恢复', 'success');
+          flushPendingRetry();
+        }
+      }
+
+      function checkConnection() {
+        if (!state.token) {
+          setConnChip(navigator.onLine === false ? 'bad' : 'ok', navigator.onLine === false ? '离线' : '未登录');
+          setOffline(navigator.onLine === false);
+          return Promise.resolve(false);
+        }
+
+        return probeConnection(8000).then(function (ok) {
+          if (ok) {
+            setConnChip('ok', '已连接');
+            setOffline(false);
+            return true;
+          }
+
+          setConnChip('bad', navigator.onLine === false ? '网络离线' : '连接失败');
+          setOffline(true);
+          return false;
+        });
       }
 
       function bootstrapData() {
         if (!state.token) return;
-        checkHealth();
-        loadAIConfig();
-        loadBanks();
-      }
-
-      function apiUrl(path) { return (state.apiBase || '') + '/api' + path; }
-
-      function authHeaders(extra) {
-        var headers = Object.assign({}, extra || {});
-        if (state.token) headers.Authorization = 'Bearer ' + state.token;
-        return headers;
+        checkConnection().then(function (ok) {
+          if (!ok) {
+            restoreDraftOrEmpty();
+            return;
+          }
+          loadAIConfig();
+          loadBanks();
+          restoreDraftOrEmpty();
+        });
       }
 
       function setConnChip(kind, text) {
@@ -873,23 +1035,17 @@
         if (label) label.textContent = text;
       }
 
-      function checkHealth() {
-        setConnChip('checking', '检测中');
-        var controller = new AbortController();
-        var timer = window.setTimeout(function () { controller.abort(); }, 8000);
+      /* ================= 网络 ================= */
+      function apiUrl(path) { return (state.apiBase || '') + '/api' + path; }
 
-        fetch(apiUrl('/banks'), { cache: 'no-store', headers: authHeaders(), signal: controller.signal })
-          .then(function (res) {
-            setConnChip(res.ok ? 'ok' : 'bad', res.ok ? '已连接' : '连接异常');
-          })
-          .catch(function () {
-            setConnChip('bad', navigator.onLine === false ? '网络离线' : '连接失败');
-          })
-          .then(function () { window.clearTimeout(timer); });
+      function authHeaders(extra) {
+        var headers = Object.assign({}, extra || {});
+        if (state.token) headers.Authorization = 'Bearer ' + state.token;
+        return headers;
       }
 
       function loadAIConfig() {
-        if (!state.token) return;
+        if (!state.token || state.offline) return;
 
         fetch(apiUrl('/plugins/ai/config'), { headers: authHeaders() })
           .then(function (res) {
@@ -928,6 +1084,12 @@
         el.bankSelect.disabled = true;
         el.bankSelect.replaceChildren(new Option('加载中…', ''));
 
+        if (state.offline) {
+          el.bankSelect.replaceChildren(new Option('离线：暂时无法读取题库（仍可导入为散题）', ''));
+          el.bankSelect.disabled = false;
+          return;
+        }
+
         fetch(apiUrl('/banks'), { headers: authHeaders() })
           .then(function (res) {
             if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -952,6 +1114,12 @@
 
         if (!bankId) {
           el.paperSelect.replaceChildren(new Option('散题', ''));
+          el.paperSelect.disabled = true;
+          return;
+        }
+
+        if (state.offline) {
+          el.paperSelect.replaceChildren(new Option('离线：无法读取试卷', ''));
           el.paperSelect.disabled = true;
           return;
         }
@@ -994,6 +1162,98 @@
         });
       }
 
+      /* ================= 草稿持久化 ================= */
+      function saveDraft() {
+        if (!state.items.length) {
+          store.remove(DRAFT_KEY);
+          el.draftBanner.hidden = true;
+          return;
+        }
+
+        var payload = {
+          version: 1,
+          savedAt: Date.now(),
+          type: state.type,
+          items: state.items.map(function (item) {
+            return { title: item.title, desc: item.desc, selected: item.selected };
+          })
+        };
+
+        try {
+          localStorage.setItem(DRAFT_KEY, JSON.stringify(payload));
+        } catch (e) {}
+      }
+
+      function readDraft() {
+        var raw = store.get(DRAFT_KEY);
+        if (!raw) return null;
+
+        try {
+          var data = JSON.parse(raw);
+          if (!data || !Array.isArray(data.items) || !data.items.length) return null;
+          return data;
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function restoreDraftOrEmpty() {
+        var draft = readDraft();
+        if (!draft) {
+          showResults(false);
+          return;
+        }
+
+        if (draft.type) {
+          state.type = draft.type;
+          $$('button[data-type]', el.typeSeg).forEach(function (candidate) {
+            var active = candidate.dataset.type === draft.type;
+            candidate.classList.toggle('active', active);
+            candidate.setAttribute('aria-checked', String(active));
+          });
+        }
+
+        setItems(draft.items.map(function (item) {
+          return {
+            title: item.title,
+            description: item.desc,
+            selected: item.selected !== false
+          };
+        }));
+
+        showResults(true);
+        el.draftBanner.hidden = false;
+        el.draftBannerText.textContent = '已恢复 ' + new Date(draft.savedAt).toLocaleString() + ' 的识别结果（本地草稿）';
+      }
+
+      function discardDraft() {
+        store.remove(DRAFT_KEY);
+        el.draftBanner.hidden = true;
+        resetForNext();
+        toast('已丢弃本地草稿', 'info');
+      }
+
+      /* ================= 延迟重试 ================= */
+      function scheduleRetry(kind) {
+        state.pendingRetry = kind;
+        updateActionBar();
+      }
+
+      function flushPendingRetry() {
+        var kind = state.pendingRetry;
+        if (!kind) return;
+        state.pendingRetry = null;
+
+        if (kind === 'parse' && state.file) {
+          toast('网络已恢复，继续识别', 'info');
+          parseImage();
+        } else if (kind === 'import') {
+          toast('网络已恢复，请再次点击导入', 'info');
+        }
+        updateActionBar();
+      }
+
+      /* ================= 图片处理 ================= */
       function formatSize(bytes) {
         if (bytes < 1024) return bytes + ' B';
         if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + ' KB';
@@ -1075,6 +1335,7 @@
           el.parseBtn.disabled = false;
           el.parseBtn.textContent = '开始识别';
           hideConfigNotice();
+          updateActionBar();
         });
       }
 
@@ -1090,9 +1351,18 @@
         el.parseBtn.textContent = '开始识别';
       }
 
+      /* ================= 识别 ================= */
       function parseImage() {
         if (!state.file || state.parsing) return;
         if (!state.token) { refreshAuthUI(); return; }
+
+        if (state.offline || navigator.onLine === false) {
+          state.offline = true;
+          refreshAuthUI();
+          scheduleRetry('parse');
+          toast('当前离线，恢复网络后会自动识别', 'error', 4000);
+          return;
+        }
 
         state.parsing = true;
         state.abort = new AbortController();
@@ -1140,6 +1410,9 @@
                 if (res.status === 400 && /(配置|API\s*Key|Base\s*URL|模型)/i.test(detail)) {
                   showConfigNotice(detail);
                 }
+                if (res.status >= 500) {
+                  setOffline(true);
+                }
                 throw new Error(detail);
               });
             }
@@ -1151,6 +1424,7 @@
 
             setItems(list);
             showResults(true);
+            el.draftBanner.hidden = true;
             toast('识别完成，共 ' + list.length + ' 道题', 'success');
 
             window.setTimeout(function () {
@@ -1160,6 +1434,10 @@
           .catch(function (err) {
             if (err && err.name === 'AbortError') {
               toast('已取消识别', 'info');
+            } else if (!navigator.onLine) {
+              setOffline(true);
+              scheduleRetry('parse');
+              toast('网络已断开，恢复后自动重试识别', 'error', 5000);
             } else {
               toast((err && err.message) || '识别失败，请稍后重试', 'error', 6000);
             }
@@ -1171,9 +1449,11 @@
             el.progressCard.hidden = true;
             el.parseBtn.disabled = !state.file;
             el.parseBtn.textContent = '开始识别';
+            updateActionBar();
           });
       }
 
+      /* ================= 结果渲染 ================= */
       function normalizeDescription(text) {
         return String(text || '')
           .replace(/\r\n/g, '\n')
@@ -1279,17 +1559,20 @@
 
         checkbox.addEventListener('change', function () {
           item.selected = checkbox.checked;
+          saveDraft();
           updateActionBar();
         });
 
         titleInput.addEventListener('input', function () {
           item.title = titleInput.value;
+          saveDraft();
         });
 
         textarea.addEventListener('input', function () {
           item.desc = textarea.value;
           refreshStat();
           autoGrow(textarea);
+          saveDraft();
         });
 
         toggle.addEventListener('click', function () {
@@ -1328,13 +1611,14 @@
             id: 'item-' + now + '-' + index,
             title: String(item && item.title ? item.title : '题目 ' + (index + 1)).trim(),
             desc: normalizeDescription(item && item.description),
-            selected: true,
+            selected: item && item.selected === false ? false : true,
             editing: false,
             el: null
           };
         });
 
         renderList();
+        saveDraft();
       }
 
       function removeItem(item) {
@@ -1351,6 +1635,7 @@
         if (!state.items.length) {
           resetForNext();
         } else {
+          saveDraft();
           updateActionBar();
         }
       }
@@ -1367,6 +1652,8 @@
         el.resultList.replaceChildren();
         el.resultCount.textContent = '0';
         showResults(false);
+        store.remove(DRAFT_KEY);
+        el.draftBanner.hidden = true;
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
 
@@ -1374,14 +1661,26 @@
         var selected = state.items.filter(function (item) { return item.selected; }).length;
         var visible = document.body.classList.contains('has-results');
         var allSelected = state.items.length > 0 && state.items.every(function (item) { return item.selected; });
+        var blocked = state.offline || state.importing;
 
         el.selectedCount.textContent = String(selected);
         el.selectAllBtn.textContent = allSelected ? '取消全选' : '全选';
-        el.importBtn.disabled = selected === 0 || state.importing;
-        el.importBtn.textContent = state.importing ? '导入中…' : '导入题库';
-        el.actionSub.textContent = state.importing
-          ? '正在写入数据库…'
-          : (selected ? '确认无误后导入' : '请至少选择一道题');
+        el.importBtn.disabled = selected === 0 || blocked;
+        el.importBtn.textContent = state.importing ? '导入中…' : (state.offline ? '离线不可导入' : '导入题库');
+
+        el.actionSub.classList.toggle('warn', state.offline || state.pendingRetry === 'parse');
+        if (state.importing) {
+          el.actionSub.textContent = '正在写入数据库…';
+        } else if (state.offline) {
+          el.actionSub.textContent = state.pendingRetry === 'parse' ? '离线中，恢复网络后自动识别' : '离线中，恢复网络后可导入';
+        } else if (state.pendingRetry === 'parse') {
+          el.actionSub.textContent = '等待网络恢复后重试识别';
+        } else if (!selected) {
+          el.actionSub.textContent = '请至少选择一道题';
+        } else {
+          el.actionSub.textContent = '确认无误后导入';
+        }
+
         el.actionBar.hidden = !visible || state.items.length === 0;
       }
 
@@ -1398,11 +1697,16 @@
           }
         });
 
+        saveDraft();
         updateActionBar();
       }
 
+      /* ================= 导入 ================= */
       function importSelected() {
-        if (state.importing) return;
+        if (state.importing || state.offline) {
+          if (state.offline) toast('当前离线，恢复网络后再导入', 'error');
+          return;
+        }
 
         var selected = state.items.filter(function (item) { return item.selected; });
         if (!selected.length) {
@@ -1451,6 +1755,7 @@
                 if (res.status === 403) {
                   openDrawer('管理员密钥不正确，请重新输入。');
                 }
+                if (res.status >= 500) setOffline(true);
                 throw new Error(detail);
               });
             }
@@ -1463,9 +1768,16 @@
 
             toast('已导入 ' + imported + ' 道题目', 'success', 4000);
             resetForNext();
+            loadBanks();
           })
           .catch(function (err) {
-            toast((err && err.message) || '导入失败，请稍后重试', 'error', 6000);
+            if (!navigator.onLine) {
+              setOffline(true);
+              scheduleRetry('import');
+              toast('网络已断开，识别结果已保留，恢复后可再次导入', 'error', 5000);
+            } else {
+              toast((err && err.message) || '导入失败，请稍后重试', 'error', 6000);
+            }
           })
           .then(function () {
             state.importing = false;
@@ -1473,6 +1785,7 @@
           });
       }
 
+      /* ================= 通知 / 抽屉 ================= */
       var toastTimer = 0;
 
       function toast(message, kind, duration) {
@@ -1530,9 +1843,30 @@
         }
       }
 
+      /* ================= 事件绑定 ================= */
       el.goLoginBtn.addEventListener('click', function () { goToParent('/login'); });
       el.goSettingsBtn.addEventListener('click', function () { goToParent('/settings'); });
+      el.goSettingsFromOfflineBtn.addEventListener('click', function () { goToParent('/settings'); });
       el.modelStatus.addEventListener('click', function () { goToParent('/settings'); });
+
+      el.retryConnBtn.addEventListener('click', function () {
+        el.retryConnBtn.disabled = true;
+        checkConnection().then(function (ok) {
+          el.retryConnBtn.disabled = false;
+          if (ok) {
+            toast('已重新连接', 'success');
+            loadAIConfig();
+            loadBanks();
+            restoreDraftOrEmpty();
+          } else {
+            toast('仍然无法连接，请检查网络或后端地址', 'error', 4000);
+          }
+        });
+      });
+
+      el.draftDiscardBtn.addEventListener('click', function () {
+        if (window.confirm('丢弃后当前识别结果将无法恢复，确定？')) discardDraft();
+      });
 
       el.cameraBtn.addEventListener('click', function (event) {
         event.stopPropagation();
@@ -1599,6 +1933,7 @@
       el.clearImgBtn.addEventListener('click', function (event) {
         event.stopPropagation();
         clearImage();
+        updateActionBar();
       });
 
       el.typeSeg.addEventListener('click', function (event) {
@@ -1611,6 +1946,7 @@
           candidate.classList.toggle('active', active);
           candidate.setAttribute('aria-checked', String(active));
         });
+        saveDraft();
       });
 
       el.bankSelect.addEventListener('change', function () {
@@ -1646,8 +1982,16 @@
         else if (state.parsing && state.abort) state.abort.abort();
       });
 
-      window.addEventListener('online', checkHealth);
+      window.addEventListener('online', function () {
+        toast('检测到网络恢复，正在重连…', 'info');
+        checkConnection();
+      });
 
+      window.addEventListener('offline', function () {
+        setOffline(true);
+      });
+
+      /* ================= MathJax 就绪后补渲染 ================= */
       (function waitForMathJax(attempt) {
         if (window.__MATHJAX_FAILED__) return;
         var mathJax = window.MathJax;
@@ -1663,7 +2007,24 @@
         window.setTimeout(function () { waitForMathJax(attempt + 1); }, 500);
       })(0);
 
+      /* ================= 键盘补偿 ================= */
+      function bindKeyboardInset() {
+        var vv = window.visualViewport;
+        if (!vv) return;
+
+        var apply = function () {
+          var inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+          document.documentElement.style.setProperty('--keyboard-inset', inset + 'px');
+        };
+
+        vv.addEventListener('resize', apply);
+        vv.addEventListener('scroll', apply);
+        apply();
+      }
+
+      /* ================= 启动 ================= */
       readContextFromLocation();
+      bindKeyboardInset();
       refreshAuthUI();
       if (state.token) bootstrapData();
       requestContext();
