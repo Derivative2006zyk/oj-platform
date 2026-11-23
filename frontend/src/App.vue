@@ -8,23 +8,71 @@
 <script setup lang="ts">
 import NavBar from './components/NavBar.vue'
 import { onMounted, onUnmounted } from 'vue'
+import { App as CapacitorApp } from '@capacitor/app'
 import { initOfflineQueue, processQueue } from './utils/offline-queue'
+import { probe, markOffline } from './utils/connectivity'
 
 let syncHandler: () => void
+let removeBackListener: (() => void) | null = null
+
+function bindKeyboardInset() {
+  const vv = window.visualViewport
+  if (!vv) return
+
+  const apply = () => {
+    const inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop)
+    document.documentElement.style.setProperty('--keyboard-inset', inset + 'px')
+  }
+
+  vv.addEventListener('resize', apply)
+  vv.addEventListener('scroll', apply)
+  apply()
+}
+
+function bindBackButton() {
+  CapacitorApp.addListener('backButton', ({ canGoBack }) => {
+    const closable = document.querySelector('.drawer-mask:not([hidden]), .modal-mask')
+    if (closable) return
+
+    if (canGoBack) window.history.back()
+    else CapacitorApp.exitApp()
+  }).then(handle => {
+    removeBackListener = () => handle.remove()
+  }).catch(() => {})
+}
+
+function onOnline() {
+  probe()
+}
+
+function onOffline() {
+  markOffline()
+}
 
 onMounted(() => {
   initOfflineQueue()
   if (navigator.onLine) {
     processQueue()
+    probe()
   }
+
+  window.addEventListener('online', onOnline)
+  window.addEventListener('offline', onOffline)
+
   syncHandler = () => {
     console.log('检测到队列同步完成，当前页面数据将更新')
   }
   window.addEventListener('offline-queue-synced', syncHandler)
+
+  bindKeyboardInset()
+  bindBackButton()
 })
 
 onUnmounted(() => {
+  window.removeEventListener('online', onOnline)
+  window.removeEventListener('offline', onOffline)
   window.removeEventListener('offline-queue-synced', syncHandler)
+  removeBackListener?.()
 })
 </script>
 
