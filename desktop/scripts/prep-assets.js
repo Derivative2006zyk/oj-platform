@@ -55,13 +55,21 @@ function main() {
   rmrf(assetsDir)
   fs.mkdirSync(assetsDir, { recursive: true })
 
-  // docker-compose.yml
+  // 仓库开发用 compose
   const composeSrc = path.join(root, 'docker-compose.yml')
   if (!fs.existsSync(composeSrc)) {
     console.error('[prep-assets] docker-compose.yml not found at', composeSrc)
     process.exit(1)
   }
   copyFile(composeSrc, path.join(assetsDir, 'docker-compose.yml'))
+
+  // 桌面端专用 compose（独立项目名，避免与开发环境互相接管容器）
+  const composeDesktopSrc = path.join(root, 'docker-compose.desktop.yml')
+  if (!fs.existsSync(composeDesktopSrc)) {
+    console.error('[prep-assets] docker-compose.desktop.yml not found at', composeDesktopSrc)
+    process.exit(1)
+  }
+  copyFile(composeDesktopSrc, path.join(assetsDir, 'docker-compose.desktop.yml'))
 
   // .env.example（可选）
   const envExampleSrc = path.join(root, '.env.example')

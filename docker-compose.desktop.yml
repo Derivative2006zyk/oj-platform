@@ -1,0 +1,101 @@
+name: oj-platform-desktop
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: oj
+      POSTGRES_PASSWORD: oj_password
+      POSTGRES_DB: oj_platform
+      TZ: Asia/Shanghai
+      PGTZ: Asia/Shanghai
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oj -d oj_platform"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./data/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://oj:oj_password@postgres:5432/oj_platform
+      REDIS_URL: redis://redis:6379/0
+      EVENT_BUS_CHANNEL: oj:events
+      ADMIN_KEY: ${ADMIN_KEY:-admin-key-change-me}
+      IN_DOCKER: "1"
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - ./backend/plugins_installed:/app/plugins_installed
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    build: ./backend
+    command: arq app.plugins.judge_plugin.worker.WorkerSettings
+    environment:
+      SKIP_MIGRATIONS: "1"
+      DATABASE_URL: postgresql+asyncpg://oj:oj_password@postgres:5432/oj_platform
+      REDIS_URL: redis://redis:6379/0
+      EVENT_BUS_CHANNEL: oj:events
+      IN_DOCKER: "1"
+      SANDBOX_VOLUME_NAME: "oj-platform-desktop_sandbox_data"
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - /var/run/docker.sock:/var/run/docker.sock
+      - sandbox_data:/sandbox
+      - ./backend/plugins_installed:/app/plugins_installed
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    restart: unless-stopped
+
+  sandbox-python:
+    build: ./backend/sandbox/python
+    image: judge-python:latest
+    command: ["/bin/true"]
+    restart: "no"
+
+  sandbox-java:
+    build: ./backend/sandbox/java
+    image: judge-java:latest
+    command: ["/bin/true"]
+    restart: "no"
+
+  sandbox-cpp:
+    build: ./backend/sandbox/cpp
+    image: judge-cpp:latest
+    command: ["/bin/true"]
+    restart: "no"
+
+volumes:
+  sandbox_data:

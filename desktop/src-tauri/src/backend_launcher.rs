@@ -11,6 +11,10 @@ const BACKEND_PORT: u16 = 8000;
 const MAX_WAIT_SECONDS: u64 = 180;
 const POLL_INTERVAL_MS: u64 = 1000;
 
+// 桌面端使用独立 compose 文件与项目名，避免与仓库开发环境互相接管容器
+const DESKTOP_COMPOSE_FILE: &str = "docker-compose.desktop.yml";
+const DESKTOP_PROJECT_NAME: &str = "oj-platform-desktop";
+
 static EMBEDDED: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/assets");
 
 // ===== 数据目录 =====
@@ -66,7 +70,6 @@ fn extract_assets_if_needed() -> Result<PathBuf, String> {
     let env_target = target.join(".env");
 
     // 1. 每次启动，强制用 exe 内置的最新 compose 文件覆盖本地
-    //    这样可以保证软件升级后，基础设施配置跟着自动升级
     if let Some(file) = EMBEDDED.get_file("docker-compose.yml") {
         fs::write(&compose_target, file.contents())
             .map_err(|e| format!("write docker-compose.yml: {}", e))?;
@@ -86,7 +89,6 @@ fn extract_assets_if_needed() -> Result<PathBuf, String> {
     }
 
     // 4. 强制覆盖解压后端代码资源
-    //    利用 Docker build 缓存，覆盖源码不会导致重复构建
     println!("[launcher] extracting/updating assets to {:?}", target);
     extract_dir(&EMBEDDED, &target)?;
 
@@ -129,7 +131,7 @@ enum DockerStatus {
 
 fn collect_candidates() -> Vec<DockerCmd> {
     let mut out = Vec::new();
-    
+
     if cfg!(target_os = "windows") {
         let paths = [
             r"C:\Program Files\Docker\Docker\resources\bin\docker.exe",
@@ -225,10 +227,57 @@ fn probe_docker() -> DockerStatus {
     DockerStatus::Ready(cmd)
 }
 
+// ===== 检测开发环境容器是否占用资源 =====
+fn detect_foreign_compose(cmd: &DockerCmd) -> Option<String> {
+    let out = run_cmd(cmd, &["ps", "--format", "{{.Names}}"]).ok()?;
+    if !out.status.success() {
+        return None;
+    }
+
+    let names = String::from_utf8_lossy(&out.stdout);
+    let conflict = names.lines().any(|n| {
+        let n = n.trim();
+        n.starts_with("oj-platform-") && !n.starts_with(&format!("{}-", DESKTOP_PROJECT_NAME))
+    });
+
+    if conflict {
+        Some(
+            "检测到开发环境（oj-platform）的容器仍在运行，会占用 8000 端口并可能接管数据。\n\n\
+             【解决方法】\n\
+             请先在项目目录执行：\n\
+             docker compose down\n\
+             然后再重新打开本软件。".to_string()
+        )
+    } else {
+        None
+    }
+}
+
 // ===== 启动 compose =====
 fn start_compose(cmd: &DockerCmd, root: &Path) -> Result<(), String> {
+    let compose_file = root.join(DESKTOP_COMPOSE_FILE);
+    if !compose_file.exists() {
+        return Err(format!(
+            "未找到桌面端编排文件：{}\n\n请重新安装本软件（资源解压异常）。",
+            compose_file.display()
+        ));
+    }
+
+    if let Some(msg) = detect_foreign_compose(cmd) {
+        return Err(msg);
+    }
+
     let mut c = cmd.build();
-    c.args(["compose", "up", "-d"]).current_dir(root);
+    c.args([
+        "compose",
+        "-p",
+        DESKTOP_PROJECT_NAME,
+        "-f",
+        DESKTOP_COMPOSE_FILE,
+        "up",
+        "-d",
+    ])
+    .current_dir(root);
 
     let output = c.output().map_err(|e| format!("spawn failed: {}", e))?;
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
@@ -356,6 +405,14 @@ pub fn restart_backend() -> Result<(), String> {
     let root = app_data_dir();
     println!("[launcher] restarting backend containers in {:?}", root);
 
+    let compose_file = root.join(DESKTOP_COMPOSE_FILE);
+    if !compose_file.exists() {
+        return Err(format!(
+            "未找到桌面端编排文件：{}",
+            compose_file.display()
+        ));
+    }
+
     let candidates = collect_candidates();
     let mut found_cmd = None;
 
@@ -373,10 +430,19 @@ pub fn restart_backend() -> Result<(), String> {
         None => return Err("未找到可用的 Docker 命令".to_string()),
     };
 
-    // 执行 docker compose restart backend worker
+    // 执行 docker compose -p oj-platform-desktop -f docker-compose.desktop.yml restart backend worker
     let mut c = cmd.build();
-    c.args(["compose", "restart", "backend", "worker"])
-        .current_dir(&root);
+    c.args([
+        "compose",
+        "-p",
+        DESKTOP_PROJECT_NAME,
+        "-f",
+        DESKTOP_COMPOSE_FILE,
+        "restart",
+        "backend",
+        "worker",
+    ])
+    .current_dir(&root);
 
     let output = c.output().map_err(|e| format!("执行重启失败: {}", e))?;
     if !output.status.success() {
@@ -385,10 +451,9 @@ pub fn restart_backend() -> Result<(), String> {
     }
 
     println!("[launcher] containers restarted, waiting for backend...");
-    
-    // 等待后端端口就绪
+
     wait_for_backend()?;
-    
+
     println!("[launcher] backend is ready after restart");
     Ok(())
 }
