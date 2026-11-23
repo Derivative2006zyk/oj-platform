@@ -4,8 +4,8 @@ import api from '../utils/axios'
 export interface Category {
   id: number
   name: string
-  description?: string
-  sort_order: number
+  description?: string | null
+  sort_order?: number
 }
 
 export async function getCategories(): Promise<Category[]> {
@@ -21,8 +21,9 @@ export interface ProblemSummary {
   difficulty: number
   tags: string[]
   category_id: number
-  bank_id?: number | null     // 【新增】
-  paper_id?: number | null    // 【新增】
+  bank_id?: number | null
+  paper_id?: number | null
+  paper_name?: string | null
 }
 
 export interface ProblemListResponse {
