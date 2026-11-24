@@ -181,7 +181,10 @@ async function onFileSelected(e: Event) {
   if (!input.files || input.files.length === 0) return
   const file = input.files[0]
   input.value = ''
-
+  if (!navigator.onLine) {
+    alert('识别需要联网，恢复网络后再试')
+    return
+  }
   step.value = 'parsing'
   const formData = new FormData()
   formData.append('file', file)

@@ -198,6 +198,7 @@ import {
   createProblem,
   updateProblem,
   uploadImage,
+  isQueued,
   type Category
 } from '../api/problem'
 import { listBanks, type Bank } from '../api/bank'
@@ -428,14 +429,19 @@ async function submit() {
   try {
     if (isEdit.value) {
       const res = await updateProblem(Number(route.params.id), data)
-      
-      if (res && (res as any).message === 'offline-saved') {
-        alert('当前无网络，修改已保存至本地队列。网络恢复后将自动同步。')
-      } else {
-        alert('更新成功')
+      if (isQueued(res)) {
+        alert('当前离线，修改已保存到本地队列，联网后自动提交')
+        router.push('/')
+        return
       }
+      alert('更新成功')
     } else {
-      await createProblem(data)
+      const res = await createProblem(data)
+      if (isQueued(res)) {
+        alert('当前离线，题目已保存到本地队列，联网后自动提交')
+        router.push('/')
+        return
+      }
       alert('创建成功')
     }
     router.push('/')

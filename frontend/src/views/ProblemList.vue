@@ -623,6 +623,10 @@ function onOcrSuccess() {
 }
 
 async function onDelete(id: number) {
+  if (!navigator.onLine) {
+    alert('删除需要联网，请检查网络后再试')
+    return
+  }
   if (!confirm(`确定删除题目 #${id} 吗？此操作不可恢复。`)) return
   try {
     await deleteProblem(id)
