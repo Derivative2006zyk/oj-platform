@@ -37,7 +37,6 @@ export async function submitCode(data: SubmissionCreate): Promise<SubmissionDeta
       console.log('[API] 离线提交触发，加入队列')
       
       enqueueAction({
-        id: Date.now().toString() + Math.random().toString(36).slice(2),
         method: 'post',
         url: '/submissions',
         data: data,

@@ -1,80 +1,224 @@
-import api from './axios'
-import { setCache, getCache } from './cache'
+import { getCache } from './cache'
+
+export type QueuedStatus = 'pending' | 'conflict' | 'dead'
 
 export interface OfflineAction {
-  id: string // 唯一标识（时间戳+随机数）
+  id: string
   method: 'post' | 'put' | 'delete'
   url: string
   data?: any
-  headers?: any
-  description: string // 例如："修改题目 #12"
+  headers?: Record<string, string>
+  description: string
+  createdAt: number
+  attempts: number
+  lastError?: string
+  status: QueuedStatus
 }
 
 const QUEUE_KEY = 'oj_offline_queue'
+const MAX_ATTEMPTS = 5
 
+// ===== 存储 =====
 export function getQueue(): OfflineAction[] {
-  return getCache<OfflineAction[]>(QUEUE_KEY) || []
+  const raw = getCache<OfflineAction[]>(QUEUE_KEY)
+  if (!Array.isArray(raw)) return []
+
+  return raw
+    .filter((a): a is OfflineAction => !!a && typeof a.id === 'string')
+    .map(a => ({
+      ...a,
+      createdAt: typeof a.createdAt === 'number' ? a.createdAt : Date.now(),
+      attempts: typeof a.attempts === 'number' ? a.attempts : 0,
+      status: a.status || 'pending',
+    }))
 }
 
-export function enqueueAction(action: OfflineAction) {
+function saveQueue(queue: OfflineAction[]) {
+  try {
+    localStorage.setItem(
+      'oj_cache_' + QUEUE_KEY,
+      JSON.stringify({ savedAt: Date.now(), data: queue })
+    )
+  } catch (e) {
+    console.warn('[OfflineQueue] 持久化失败', e)
+  }
+  window.dispatchEvent(new Event('offline-queue-changed'))
+}
+
+function genId() {
+  return `op_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+}
+
+// ===== 入队 =====
+export function enqueueAction(
+  input: Omit<OfflineAction, 'id' | 'createdAt' | 'attempts' | 'status'>
+): OfflineAction {
+  const action: OfflineAction = {
+    ...input,
+    id: genId(),
+    createdAt: Date.now(),
+    attempts: 0,
+    status: 'pending',
+  }
+
   const queue = getQueue()
   queue.push(action)
-  setCache(QUEUE_KEY, queue)
+  saveQueue(queue)
+
   console.log(`[OfflineQueue] 已加入队列: ${action.description}`)
+  return action
 }
 
+// ===== 移除 / 状态变更 =====
 export function removeActionFromQueue(id: string) {
-  let queue = getQueue()
-  queue = queue.filter(a => a.id !== id)
-  setCache(QUEUE_KEY, queue)
+  saveQueue(getQueue().filter(a => a.id !== id))
 }
 
-// 触发队列同步
-export async function processQueue() {
-  const queue = getQueue()
-  if (queue.length === 0) return
+export function updateAction(id: string, patch: Partial<OfflineAction>) {
+  saveQueue(getQueue().map(a => (a.id === id ? { ...a, ...patch } : a)))
+}
 
-  console.log(`[OfflineQueue] 开始同步 ${queue.length} 个离线操作...`)
-  const remainingQueue: OfflineAction[] = []
+export function clearDeadActions() {
+  saveQueue(getQueue().filter(a => a.status !== 'dead'))
+}
+
+export function clearAllActions() {
+  saveQueue([])
+}
+
+export function getPendingCount(): number {
+  return getQueue().filter(a => a.status === 'pending' || a.status === 'conflict').length
+}
+
+export function getDeadCount(): number {
+  return getQueue().filter(a => a.status === 'dead').length
+}
+
+// ===== 分类：哪些写操作可以入队 =====
+export function shouldQueue(method: string, url: string): boolean {
+  const m = method.toUpperCase()
+
+  if (m === 'DELETE') return false
+  if (url.includes('/submissions')) return false
+  if (url.includes('/admin/images')) return false
+  if (url.includes('/admin/bank/import')) return false
+  if (url.includes('/plugins/llm_ocr/parse')) return false
+  if (url.includes('/plugins/ai/chat')) return false
+
+  return url.includes('/admin/problems')
+}
+
+export function describeAction(method: string, url: string, data?: any): string {
+  const m = method.toUpperCase()
+  const idMatch = url.match(/\/admin\/problems\/(\d+)/)
+
+  if (idMatch) {
+    const verb = m === 'PUT' ? '修改' : m === 'DELETE' ? '删除' : '操作'
+    return `${verb}题目 #${idMatch[1]}`
+  }
+
+  if (m === 'POST' && url.includes('/admin/problems')) {
+    const title = data?.title ? `「${data.title}」` : ''
+    return `新建题目${title}`
+  }
+
+  return `${m} ${url}`
+}
+
+// ===== 回放 =====
+let processing = false
+
+export async function processQueue(): Promise<{ synced: number; failed: number }> {
+  if (processing) return { synced: 0, failed: 0 }
+
+  const queue = getQueue().filter(a => a.status === 'pending')
+  if (queue.length === 0) return { synced: 0, failed: 0 }
+
+  processing = true
+  let synced = 0
+  let failed = 0
+
+  console.log(`[OfflineQueue] 开始同步 ${queue.length} 个离线操作…`)
 
   for (const action of queue) {
     try {
-      // 重新发起请求
+      const { default: api } = await import('./axios')
       await api.request({
         method: action.method,
         url: action.url,
         data: action.data,
-        headers: action.headers
+        headers: action.headers,
       })
+
+      removeActionFromQueue(action.id)
+      synced += 1
       console.log(`[OfflineQueue] 同步成功: ${action.description}`)
     } catch (e: any) {
-      // 如果是因为断网或超时，重新放回队列
-      if (!e.response || e.code === 'ERR_NETWORK' || e.code === 'ECONNABORTED' || e.message?.includes('timeout')) {
-        remainingQueue.push(action)
-      } 
-      // 如果是 409 冲突，说明数据在服务器被其他设备改过了
-      else if (e.response?.status === 409) {
-        alert(`【同步冲突】你之前离线修改的「${action.description}」无法同步：\n该题目已被其他设备修改。你的离线修改已丢失，请刷新页面获取最新版本。`)
-      } 
-      // 如果是其他错误（如 401 权限过期），也只能丢弃
-      else {
-        console.warn(`[OfflineQueue] 同步失败，丢弃: ${action.description}`, e)
+      const status = e?.response?.status
+
+      // 仍然断网：计数后保留，下轮再试
+      if (!e.response || e.code === 'ERR_NETWORK' || e.message?.includes('timeout')) {
+        updateAction(action.id, {
+          attempts: action.attempts + 1,
+          lastError: '网络不可用',
+        })
+        failed += 1
+        continue
       }
+
+      // 冲突：不自动覆盖，标记等待人工处理
+      if (status === 409) {
+        updateAction(action.id, {
+          status: 'conflict',
+          attempts: action.attempts + 1,
+          lastError: '内容已被其他设备修改',
+        })
+        failed += 1
+        continue
+      }
+
+      // 其他 4xx：参数错误，重试无意义
+      if (status && status >= 400 && status < 500) {
+        updateAction(action.id, {
+          status: 'dead',
+          attempts: action.attempts + 1,
+          lastError: e?.response?.data?.detail || `请求失败（${status}）`,
+        })
+        failed += 1
+        continue
+      }
+
+      // 5xx：计数，超过上限进死信
+      const attempts = action.attempts + 1
+      updateAction(action.id, {
+        attempts,
+        status: attempts >= MAX_ATTEMPTS ? 'dead' : 'pending',
+        lastError: e?.message || '服务端错误',
+      })
+      failed += 1
     }
   }
 
-  setCache(QUEUE_KEY, remainingQueue)
-  if (remainingQueue.length === 0) {
-    console.log(`[OfflineQueue] 所有离线操作同步完毕！`)
-    // 触发一个事件，通知 UI 刷新
+  processing = false
+
+  const remaining = getQueue().filter(a => a.status === 'pending').length
+  if (remaining === 0) {
+    console.log('[OfflineQueue] 待同步操作已清空')
     window.dispatchEvent(new Event('offline-queue-synced'))
   }
+
+  return { synced, failed }
 }
 
-// 全局监听网络恢复
+export function retryAction(id: string) {
+  updateAction(id, { status: 'pending', attempts: 0, lastError: undefined })
+  processQueue()
+}
+
+// ===== 初始化 =====
 export function initOfflineQueue() {
   window.addEventListener('online', () => {
-    console.log('[Network] 网络恢复，检查离线队列...')
+    console.log('[Network] 网络恢复，检查离线队列…')
     processQueue()
   })
 }

@@ -88,7 +88,15 @@ export async function getProblemAnswer(id: number): Promise<{ answer: string; ex
 }
 
 // 管理
-export async function createProblem(data: any): Promise<{ id: number }> {
+export interface QueuedResult {
+  queued: true
+}
+
+export function isQueued<T>(data: T | QueuedResult): data is QueuedResult {
+  return !!data && typeof data === 'object' && (data as any).__queued__ === true
+}
+
+export async function createProblem(data: any): Promise<{ id: number } | QueuedResult> {
   const adminKey = localStorage.getItem('admin_key') || ''
   const res = await api.post('/admin/problems', data, {
     headers: { 'X-Admin-Key': adminKey }
@@ -96,7 +104,7 @@ export async function createProblem(data: any): Promise<{ id: number }> {
   return res.data
 }
 
-export async function updateProblem(id: number, data: any): Promise<{ id: number }> {
+export async function updateProblem(id: number, data: any): Promise<{ id: number } | QueuedResult> {
   const adminKey = localStorage.getItem('admin_key') || ''
   const res = await api.put(`/admin/problems/${id}`, data, {
     headers: { 'X-Admin-Key': adminKey }
