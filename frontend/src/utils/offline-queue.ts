@@ -214,7 +214,36 @@ export function retryAction(id: string) {
   updateAction(id, { status: 'pending', attempts: 0, lastError: undefined })
   processQueue()
 }
+export function getConflictActions(): OfflineAction[] {
+  return getQueue().filter(a => a.status === 'conflict')
+}
 
+/**
+ * 解决冲突项。
+ * - server：丢弃本地修改
+ * - local：用服务端最新版本号重写后重新入队
+ */
+export function resolveConflict(id: string, resolution: 'local' | 'server', serverVersion?: number) {
+  const action = getQueue().find(a => a.id === id)
+  if (!action) return
+
+  if (resolution === 'server') {
+    removeActionFromQueue(id)
+    return
+  }
+
+  updateAction(id, {
+    status: 'pending',
+    attempts: 0,
+    lastError: undefined,
+    data: {
+      ...(action.data || {}),
+      version: typeof serverVersion === 'number' ? serverVersion : (action.data?.version ?? 1),
+    },
+  })
+
+  processQueue()
+}
 // ===== 初始化 =====
 export function initOfflineQueue() {
   window.addEventListener('online', () => {

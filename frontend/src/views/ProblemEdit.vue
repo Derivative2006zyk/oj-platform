@@ -185,6 +185,15 @@
       </button>
       <button @click="cancel" class="btn-ghost">取消</button>
     </div>
+
+    <ConflictDialog
+      :visible="conflictVisible"
+      :conflict="conflict"
+      :local="buildSubmitData()"
+      :base="baseSnapshot"
+      @close="conflictVisible = false"
+      @resolve="onResolveConflict"
+    />
   </div>
 </template>
 
@@ -201,6 +210,8 @@ import {
   isQueued,
   type Category
 } from '../api/problem'
+import ConflictDialog from '../components/ConflictDialog.vue'
+import { parseConflict, tryMerge, type ConflictDetail } from '../utils/merge'
 import { listBanks, type Bank } from '../api/bank'
 import { getCache } from '../utils/cache'
 import api from '../utils/axios' // 【新增】用于请求试卷
@@ -234,6 +245,11 @@ const form = reactive({
   subprojects: [] as any[],
   version: 1
 })
+
+// 【新增】冲突处理
+const conflict = ref<ConflictDetail | null>(null)
+const conflictVisible = ref(false)
+const baseSnapshot = ref<Record<string, any> | null>(null)
 
 // 【新增】监听题库选择，拉取对应试卷
 watch(() => form.bank_id, async (newBankId) => {
@@ -447,10 +463,16 @@ async function submit() {
     router.push('/')
   } catch (e: any) {
     if (e.response?.status === 409) {
-      alert(e.response.data.detail || '保存失败：该题目已被其他设备修改，请刷新后重试。')
+      const detail = parseConflict(e)
+      if (detail) {
+        conflict.value = detail
+        conflictVisible.value = true
+        return
+      }
+      alert('保存失败：该题目已被其他设备修改，请刷新后重试。')
       return
     }
-    
+
     const msg = e.response?.data?.detail || e.message || '保存失败'
     alert('保存失败：' + msg)
   } finally {
@@ -462,7 +484,67 @@ function cancel() {
   router.push('/')
 }
 
-// ===================== 数据回填 =====================
+// ===================== 冲突解决 =====================
+async function onResolveConflict(payload: {
+  mode: 'local' | 'server' | 'merge' | 'manual'
+  fields?: Record<string, 'local' | 'server'>
+}) {
+  if (!conflict.value) return
+
+  const server = conflict.value.server
+  const local = buildSubmitData()
+
+  if (payload.mode === 'server') {
+    conflictVisible.value = false
+    conflict.value = null
+    applyDetailToForm(server)
+    alert('已保留服务器版本')
+    return
+  }
+
+  let merged: Record<string, any>
+
+  if (payload.mode === 'local') {
+    merged = { ...local, version: server.version }
+  } else if (payload.mode === 'merge') {
+    const result = tryMerge(local, baseSnapshot.value, server)
+    if (!result.ok || !result.merged) {
+      alert('无法自动合并，请使用逐字段对比')
+      return
+    }
+    merged = result.merged
+  } else {
+    merged = { ...server }
+    Object.entries(payload.fields || {}).forEach(([field, source]) => {
+      merged[field] = source === 'local' ? local[field] : server[field]
+    })
+    merged.version = server.version
+  }
+
+  conflictVisible.value = false
+  conflict.value = null
+
+  try {
+    const res = await updateProblem(Number(route.params.id), merged)
+    if (isQueued(res)) {
+      alert('当前离线，合并结果已保存到本地队列')
+      router.push('/')
+      return
+    }
+    alert('合并保存成功')
+    router.push('/')
+  } catch (e: any) {
+    const detail = parseConflict(e)
+    if (detail) {
+      conflict.value = detail
+      conflictVisible.value = true
+      return
+    }
+    alert('合并保存失败：' + (e.response?.data?.detail || e.message))
+  }
+}
+
+// ===================== 详情回填 =====================
 function applyDetailToForm(detail: any) {
   form.title = detail.title || ''
   form.category_id = detail.category_id || 1
@@ -517,6 +599,21 @@ function applyDetailToForm(detail: any) {
         }))
       : []
   }
+
+  // 【新增】记录加载时的基线，用于三路合并
+  baseSnapshot.value = {
+    title: form.title,
+    category_id: form.category_id,
+    bank_id: form.bank_id,
+    paper_id: form.paper_id,
+    difficulty: form.difficulty,
+    description: form.description,
+    answer: form.answer,
+    explanation: form.explanation,
+    tags: tagsInput.value.split(',').map(t => t.trim()).filter(t => t),
+    options: JSON.parse(JSON.stringify(form.options)),
+    blanks: JSON.parse(JSON.stringify(form.blanks))
+  }
 }
 
 // ===================== 初始化（离线优先） =====================
@@ -547,13 +644,15 @@ onMounted(async () => {
   try {
     const detail = await getProblemDetail(id)
     applyDetailToForm(detail)
-    
+
     // 当回填数据后，如果带有 bank_id，需要拉取一次对应的试卷列表
     if (form.bank_id) {
       try {
         const papersRes = await api.get(`/papers?bank_id=${form.bank_id}`)
         papers.value = papersRes.data
-      } catch (err) { console.warn('拉取试卷列表失败', err) }
+      } catch (err) {
+        console.warn('拉取试卷列表失败', err)
+      }
     }
 
     try {
@@ -562,11 +661,20 @@ onMounted(async () => {
       if (answerData.explanation) {
         form.explanation = answerData.explanation
       }
+      // 【新增】答案回填后同步基线，避免误判为本地改动
+      if (baseSnapshot.value) {
+        baseSnapshot.value.answer = form.answer
+        baseSnapshot.value.explanation = form.explanation
+      }
     } catch (e) {
       const cachedAns = getCache<any>(`oj_problem_answer_${id}`)
       if (cachedAns) {
         form.answer = cachedAns.answer || ''
         form.explanation = cachedAns.explanation || ''
+        if (baseSnapshot.value) {
+          baseSnapshot.value.answer = form.answer
+          baseSnapshot.value.explanation = form.explanation
+        }
       }
     }
   } catch (e) {
