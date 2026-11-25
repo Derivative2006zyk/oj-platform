@@ -165,11 +165,20 @@ async def update_problem(db: AsyncSession, problem_id: int, data: ProblemUpdate)
     if not problem:
         return None
 
-    # 【新增】乐观锁校验
+    # 【新增】乐观锁校验：冲突时返回双方快照，供前端合并或人工选择
     if problem.version != data.version:
         raise HTTPException(
             status_code=409,
-            detail="保存失败：该题目已被其他设备修改，请刷新后重试。"
+            detail={
+                "message": "该题目已被其他设备修改",
+                "conflict": {
+                    "problem_id": problem.id,
+                    "client_version": data.version,
+                    "server_version": problem.version,
+                    "server_updated_at": problem.updated_at.isoformat() if problem.updated_at else None,
+                    "server": _snapshot_problem(problem),
+                },
+            },
         )
 
     update_data = data.model_dump(exclude_unset=True)
@@ -248,3 +257,21 @@ async def delete_problem(db: AsyncSession, problem_id: int):
     )
 
     return True
+
+def _snapshot_problem(problem: Problem) -> dict:
+    """返回用于冲突对比的服务端快照（字段与 ProblemUpdate 对齐）"""
+    return {
+        "title": problem.title,
+        "category_id": problem.category_id,
+        "bank_id": problem.bank_id,
+        "paper_id": problem.paper_id,
+        "type": problem.type,
+        "difficulty": problem.difficulty,
+        "description": problem.description,
+        "answer": problem.answer,
+        "explanation": problem.explanation,
+        "tags": problem.tags or [],
+        "options": problem.options,
+        "blanks": problem.blanks,
+        "version": problem.version,
+    }
