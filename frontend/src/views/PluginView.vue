@@ -56,7 +56,18 @@ const iframeUrl = computed(() => {
   if (!pluginName.value) return ''
   const base = getBackendUrl()
   const name = encodeURIComponent(pluginName.value)
-  return `${base || ''}/plugins_static/${name}/frontend/index.html?v=${cacheBuster.value}`
+  const params = new URLSearchParams()
+
+  params.set('v', String(cacheBuster.value))
+
+  // route.query 与 hash 双读取，hash 模式下的解析兼容性更好
+  const fromRoute = route.query.noauth === '1'
+  const hashQuery = window.location.hash.split('?')[1] || ''
+  const fromHash = new URLSearchParams(hashQuery).get('noauth') === '1'
+
+  if (fromRoute || fromHash) params.set('noauth', '1')
+
+  return `${base || ''}/plugins_static/${name}/frontend/index.html?${params.toString()}`
 })
 
 const newWindowUrl = computed(() => {

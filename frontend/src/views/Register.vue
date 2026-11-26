@@ -8,8 +8,9 @@
 
       <form @submit.prevent="onSubmit">
         <div class="form-item">
-          <label>用户名</label>
+          <label for="reg-username">用户名</label>
           <input
+            id="reg-username"
             v-model="form.username"
             type="text"
             required
@@ -20,8 +21,9 @@
         </div>
 
         <div class="form-item">
-          <label>邮箱</label>
+          <label for="reg-email">邮箱</label>
           <input
+            id="reg-email"
             v-model="form.email"
             type="email"
             required
@@ -30,8 +32,9 @@
         </div>
 
         <div class="form-item">
-          <label>密码</label>
+          <label for="reg-password">密码</label>
           <input
+            id="reg-password"
             v-model="form.password"
             type="password"
             required
@@ -86,17 +89,25 @@ async function onSubmit() {
       password: form.password,
     })
 
-    success.value = '注册成功，即将跳转登录...'
+    // 【修改】注册成功后直接登录，省去二次输入
+    await userStore.login({
+      username: form.username,
+      password: form.password,
+    })
 
-    setTimeout(() => {
-      router.push('/login')
-    }, 800)
+    success.value = '注册成功，正在进入...'
+    await router.push('/')
   } catch (e: any) {
     const status = e?.response?.status
+
     if (status === 409) {
       error.value = '用户名或邮箱已被占用'
     } else if (status === 422) {
       error.value = '输入格式不正确，请检查用户名、邮箱、密码'
+    } else if (status === 401) {
+      // 注册成功但自动登录失败（极少数情况），退回手动登录
+      error.value = '注册成功，但自动登录失败，请手动登录'
+      router.push('/login')
     } else {
       error.value = e?.response?.data?.detail || '注册失败，请稍后重试'
     }
@@ -157,53 +168,33 @@ async function onSubmit() {
   color: var(--color-text-secondary);
 }
 
-.form-item input {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-body);
-  font-family: inherit;
-  background: var(--color-bg-card);
-  color: var(--color-text-primary);
-  box-sizing: border-box;
-  outline: none;
-  transition: border-color 0.2s;
-}
-
-.form-item input:focus {
-  border-color: var(--color-primary);
-}
-
 .error {
   margin-bottom: var(--spacing-md);
-  padding: 10px 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
   background: var(--color-danger-bg);
   color: var(--color-danger-text);
-  font-size: 13px;
-  border-radius: var(--radius-md);
+  font-size: var(--font-size-small);
 }
 
 .success {
   margin-bottom: var(--spacing-md);
-  padding: 10px 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
   background: var(--color-success-bg);
   color: var(--color-success-text);
-  font-size: 13px;
-  border-radius: var(--radius-md);
+  font-size: var(--font-size-small);
 }
 
 .btn-primary {
   width: 100%;
-  padding: 10px 0;
-  margin-top: var(--spacing-xs);
-  background: var(--color-primary);
-  color: var(--color-primary-text);
+  padding: 10px 20px;
   border: none;
   border-radius: var(--radius-md);
+  background: var(--color-primary);
+  color: var(--color-primary-text);
   font-size: var(--font-size-body);
   font-weight: 500;
-  font-family: inherit;
   cursor: pointer;
   transition: background 0.2s;
 }
@@ -218,19 +209,14 @@ async function onSubmit() {
 }
 
 .tip {
-  margin: var(--spacing-lg) 0 0;
-  font-size: var(--font-size-small);
+  margin: var(--spacing-md) 0 0;
   text-align: center;
+  font-size: var(--font-size-small);
   color: var(--color-text-secondary);
 }
 
 .tip a {
   color: var(--color-primary);
-  text-decoration: none;
-  font-weight: 500;
-}
-
-.tip a:hover {
   text-decoration: underline;
 }
 </style>
