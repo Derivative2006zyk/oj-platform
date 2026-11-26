@@ -802,7 +802,8 @@
         contextAttempts: 0,
         offline: false,
         checking: false,
-        pendingRetry: null
+        pendingRetry: null,
+        noauth: false
       };
 
       var el = {
@@ -879,11 +880,13 @@
       function readContextFromLocation() {
         var params = new URLSearchParams(window.location.search);
 
+        state.noauth = params.get('noauth') === '1';
+
         state.apiBase = params.has('api')
           ? normalizeBase(params.get('api'))
           : normalizeBase(store.get('oj_backend_url'));
 
-        state.token = params.get('token') || store.get('oj_token') || '';
+        state.token = state.noauth ? '' : (params.get('token') || store.get('oj_token') || '');
         state.adminKey = params.get('admin_key') || store.get('admin_key') || '';
 
         applyTheme(params.get('theme') || store.get('oj_theme') || '');
@@ -907,6 +910,12 @@
       }
 
       function applyContext(data) {
+        if (state.noauth) {
+          state.contextReceived = true;
+          refreshAuthUI();
+          return;
+        }
+
         var nextApi = typeof data.apiBase === 'string' ? normalizeBase(data.apiBase) : state.apiBase;
         var nextToken = typeof data.token === 'string' ? data.token : state.token;
         var changed = nextApi !== state.apiBase || nextToken !== state.token;
@@ -931,14 +940,18 @@
 
       function refreshAuthUI() {
         var loggedIn = !!state.token;
-        el.authGate.hidden = loggedIn || !state.offline;
+
         if (!loggedIn) {
+          // 未登录：直接显示登录引导，不再依赖在线/离线状态
+          el.authGate.hidden = false;
           el.offlineGate.hidden = true;
           el.workspace.hidden = true;
           el.modelStatus.textContent = '登录后可读取模型配置';
           el.modelStatus.classList.remove('warn');
           return;
         }
+
+        el.authGate.hidden = true;
         el.offlineGate.hidden = !state.offline;
         el.workspace.hidden = false;
         el.offlineNotice.hidden = !state.offline;
