@@ -50,3 +50,8 @@ build/
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+
+# eve
+frontend/e2e/.auth/
+frontend/test-results/
+frontend/playwright-report/

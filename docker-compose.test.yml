@@ -1,0 +1,79 @@
+name: oj-platform-test
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: oj
+      POSTGRES_PASSWORD: oj_password
+      POSTGRES_DB: oj_platform_e2e
+      TZ: Asia/Shanghai
+    ports:
+      - "55432:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oj -d oj_platform_e2e"]
+      interval: 3s
+      timeout: 2s
+      retries: 20
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "56379:6379"
+    tmpfs:
+      - /data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 2s
+      retries: 20
+      start_period: 5s
+
+  backend:
+    build: ./backend
+    ports:
+      - "58000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://oj:oj_password@postgres:5432/oj_platform_e2e
+      REDIS_URL: redis://redis:6379/0
+      EVENT_BUS_CHANNEL: oj:events:e2e
+      ADMIN_KEY: e2e-key-change-me
+      IN_DOCKER: "1"
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - ./backend/plugins_installed:/app/plugins_installed
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build: ./backend
+    command: arq app.plugins.judge_plugin.worker.WorkerSettings
+    environment:
+      SKIP_MIGRATIONS: "1"
+      DATABASE_URL: postgresql+asyncpg://oj:oj_password@postgres:5432/oj_platform_e2e
+      REDIS_URL: redis://redis:6379/0
+      EVENT_BUS_CHANNEL: oj:events:e2e
+      IN_DOCKER: "1"
+      SANDBOX_VOLUME_NAME: "oj-platform-test_sandbox_data"
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - /var/run/docker.sock:/var/run/docker.sock
+      - sandbox_data:/sandbox
+      - ./backend/plugins_installed:/app/plugins_installed
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+
+volumes:
+  sandbox_data:
